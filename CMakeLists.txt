@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.11)
 project(quadra)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 add_executable(quadra
 	main.cpp
 )
@@ -49,5 +53,7 @@ add_custom_target(
 # Build quadra
 include_directories(${DECOMPILER_SOURCE_DIR})
 target_link_libraries(quadra ${DECOMPILER_SOURCE_DIR}/decompile/cpp/libsla.a)
-add_dependencies(quadra sleigh_library)
-add_dependencies(quadra sleigh_compiler)
+add_dependencies(quadra sleigh_library sleigh_compiler)
+if(UNIX)
+	target_link_libraries(quadra stdc++fs)
+endif()
