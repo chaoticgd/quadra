@@ -52,9 +52,6 @@ int main(int argc, char** argv)
 	document_storage.registerTag(sleigh_root);
 	translator.initialize(document_storage);
 	
-	context.setVariableDefault("addrsize", 1);
-	context.setVariableDefault("opsize", 1);
-	
 	// Hardcoded addresses for the x86 add example.
 	Address addr(translator.getDefaultCodeSpace(), 0x00080);
 	Address last_addr(translator.getDefaultCodeSpace(), 0x0009a);
