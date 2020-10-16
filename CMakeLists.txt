@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(quadra
 	src/main.cpp
+	src/elf_loader.cpp
 )
 
 # Download Ghidra

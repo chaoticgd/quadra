@@ -4,6 +4,8 @@
 #include <decompile/cpp/loadimage.hh>
 #include <decompile/cpp/sleigh.hh>
 
+#include "elf_loader.h"
+
 namespace fs = std::filesystem;
 
 // Most of this was adapted from sleighexample.cc.
@@ -40,8 +42,7 @@ int main(int argc, char** argv)
 	std::string slaspec_file = argv[1];
 	std::string sla_file = compile_sla_file_if_missing(slaspec_file);
 	
-	RawLoadImage loader(argv[2]);
-	loader.open();
+	ElfLoader loader(argv[2]);
 	
 	ContextInternal context;
 	
@@ -52,9 +53,10 @@ int main(int argc, char** argv)
 	document_storage.registerTag(sleigh_root);
 	translator.initialize(document_storage);
 	
-	// Hardcoded addresses for the x86 add example.
-	Address addr(translator.getDefaultCodeSpace(), 0x00080);
-	Address last_addr(translator.getDefaultCodeSpace(), 0x0009a);
+	uint64_t entry_point = loader.entry_point();
+	uint64_t entry_segment_top = loader.top_of_segment_containing(entry_point);
+	Address addr(translator.getDefaultCodeSpace(), entry_point);
+	Address last_addr(translator.getDefaultCodeSpace(), entry_segment_top);
 	
 	PcodeRawOut emit;
 	while(addr < last_addr) {
