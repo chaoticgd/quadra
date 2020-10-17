@@ -10,6 +10,10 @@ ElfLoader::ElfLoader(std::string elf_path)
 	_file_size = _file.tellg();
 	
 	_ident = read_packed<ElfIdentHeader>(_file, 0);
+	if(memcmp(_ident.magic, "\x7f\x45\x4c\x46", 4) != 0) {
+		fprintf(stderr, "error: Not a valid ELF file.\n");
+		exit(1);
+	}
 	switch(_ident.e_class) {
 		case ElfIdentClass::B32: {
 			ElfFileHeader32 header32 = read_packed<ElfFileHeader32>(_file);
@@ -48,7 +52,7 @@ ElfLoader::ElfLoader(std::string elf_path)
 			break;
 		}
 		default: {
-			fprintf(stderr, "Failed to read ELF header: Invalid e_class!\n");
+			fprintf(stderr, "error Invalid e_class in ELF header.\n");
 			exit(1);
 		}
 	}
@@ -96,7 +100,7 @@ uint64_t ElfLoader::top_of_segment_containing(uint64_t virtual_address) {
 			return top;
 		}
 	}
-	fprintf(stderr, "error: Tried to calculate bounmds of segment containing unmapped virtual address at 0x%08lx.\n", virtual_address);
+	fprintf(stderr, "error: Tried to calculate bounmds of segment containing unmapped virtual address 0x%08lx.\n", virtual_address);
 	exit(1);
 	return 0;
 }
