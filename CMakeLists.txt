@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_executable(quadra
 	src/main.cpp
 	src/elf_loader.cpp
+	src/translator.cpp
 )
 
 # Download Ghidra
@@ -17,6 +18,7 @@ FetchContent_Declare(
 	GIT_REPOSITORY https://github.com/NationalSecurityAgency/ghidra.git
 	GIT_TAG        f7f366b261589a65696c17852812566b9e6659bb
 )
+FetchContent_GetProperties(ghidra)
 if(NOT ghidra_POPULATED)
 	FetchContent_Populate(ghidra)
 	if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/processors")
@@ -26,6 +28,14 @@ if(NOT ghidra_POPULATED)
 endif()
 
 set(DECOMPILER_SOURCE_DIR "${ghidra_SOURCE_DIR}/Ghidra/Features/Decompiler/src")
+
+# LLVM
+find_package(LLVM REQUIRED CONFIG)
+message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+include_directories(${LLVM_INCLUDE_DIRS})
+add_definitions(${LLVM_DEFINITIONS})
+llvm_map_components_to_libnames(llvm_libs core support)
 
 # Build SLEIGH library
 add_custom_command(
@@ -53,7 +63,7 @@ add_custom_target(
 
 # Build quadra
 include_directories(${DECOMPILER_SOURCE_DIR})
-target_link_libraries(quadra ${DECOMPILER_SOURCE_DIR}/decompile/cpp/libsla.a)
+target_link_libraries(quadra ${DECOMPILER_SOURCE_DIR}/decompile/cpp/libsla.a ${llvm_libs})
 add_dependencies(quadra sleigh_library sleigh_compiler)
 if(UNIX)
 	target_link_libraries(quadra stdc++fs)

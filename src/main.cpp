@@ -5,6 +5,7 @@
 #include <decompile/cpp/sleigh.hh>
 
 #include "elf_loader.h"
+#include "translator.h"
 
 namespace fs = std::filesystem;
 
@@ -12,28 +13,13 @@ namespace fs = std::filesystem;
 
 void print_vardata(VarnodeData &data)
 {
-	std::cout << '(' << data.space->getName() << ',';
-	data.space->printOffset(std::cout, data.offset);
-	std::cout << ',' << dec << data.size << ')';
+	std::cerr << '(' << data.space->getName() << ',';
+	data.space->printOffset(std::cerr, data.offset);
+	std::cerr << ',' << dec << data.size << ')';
 }
 
-class PcodeRawOut : public PcodeEmit {
-public:
-	void dump(const Address &addr, OpCode opc, VarnodeData *outvar, VarnodeData *vars, int4 isize) override
-	{
-		if(outvar != (VarnodeData *)0) {
-			print_vardata(*outvar);
-			std::cout << " = ";
-		}
-		std::cout << get_opname(opc);
-		// Possibly check for a code reference or a space reference
-		for(int4 i=0;i<isize;++i) {
-			cout << ' ';
-			print_vardata(vars[i]);
-		}
-		cout << endl;
-	}
-};
+template <typename F>
+void for_each_pcodeop(Sleigh& translator, Address addr, Address last_addr, F callback);
 
 std::string compile_sla_file_if_missing(std::string slaspec_path);
 
@@ -46,19 +32,68 @@ int main(int argc, char** argv)
 	
 	ContextInternal context;
 	
-	Sleigh translator(&loader, &context);
+	Sleigh machine_code_to_pcode(&loader, &context);
 	
 	DocumentStorage document_storage;
 	Element* sleigh_root = document_storage.openDocument(sla_file)->getRoot();
 	document_storage.registerTag(sleigh_root);
-	translator.initialize(document_storage);
+	machine_code_to_pcode.initialize(document_storage);
 	
 	uint64_t entry_point = loader.entry_point();
 	uint64_t entry_segment_top = loader.top_of_segment_containing(entry_point);
-	Address addr(translator.getDefaultCodeSpace(), entry_point);
-	Address last_addr(translator.getDefaultCodeSpace(), entry_segment_top);
+	Address addr(machine_code_to_pcode.getDefaultCodeSpace(), entry_point);
+	Address last_addr(machine_code_to_pcode.getDefaultCodeSpace(), entry_segment_top);
 	
-	PcodeRawOut emit;
+	QuadraTranslator pcode_to_llvm(&machine_code_to_pcode);
+	
+	for_each_pcodeop(machine_code_to_pcode, addr, last_addr, [&](
+		const Address& addr,
+		OpCode opc,
+		VarnodeData* outvar,
+		VarnodeData* vars,
+		int4 isize)
+	{
+		// Print disassembly.
+		if(outvar != nullptr) {
+			print_vardata(*outvar);
+			std::cerr << " = ";
+		}
+		std::cerr << get_opname(opc);
+		for(int4 i = 0; i < isize; i++) {
+			std::cerr << ' ';
+			print_vardata(vars[i]);
+		}
+		std::cerr << endl;
+		
+		// Convert to LLVM IR.
+		pcode_to_llvm.translate_pcodeop(addr, opc, outvar, vars, isize);
+	});
+	
+	pcode_to_llvm.print();
+}
+
+template <typename F>
+void for_each_pcodeop(Sleigh& translator, Address addr, Address last_addr, F callback)
+{
+	class FunPcodeEmit : public PcodeEmit {
+	public:
+		FunPcodeEmit(F callback) : _callback(callback) {}
+
+		void dump(
+			const Address& addr,
+			OpCode opc,
+			VarnodeData* outvar,
+			VarnodeData* vars,
+			int4 isize) override
+		{
+			_callback(addr, opc, outvar, vars, isize);
+		}
+
+	private:
+		F _callback;
+	};
+	
+	FunPcodeEmit emit(callback);
 	while(addr < last_addr) {
 		int4 length = translator.oneInstruction(emit, addr);
 		addr = addr + length;
