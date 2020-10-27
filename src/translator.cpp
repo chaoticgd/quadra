@@ -37,6 +37,7 @@ void QuadraTranslator::translate_pcodeop(
 			break;
 		}
 		case CPUI_RETURN: { // 10
+			assert(isize == 1);
 			// HACK!
 			VarnodeData mips_v0 {
 				vars[0].space /* register space */, 0x8, 0x4
@@ -46,6 +47,7 @@ void QuadraTranslator::translate_pcodeop(
 		}
 		case CPUI_INT_EQUAL: // 11
 		case CPUI_INT_NOTEQUAL: { // 12
+			assert(isize == 2);
 			llvm::Value* eq = _builder.CreateICmpEQ(inputs[0], inputs[1], "cmp");
 			output = _builder.CreateNot(eq, "neq");
 			break;
@@ -57,14 +59,17 @@ void QuadraTranslator::translate_pcodeop(
 		case CPUI_INT_ZEXT: // 17
 			break;
 		case CPUI_INT_SEXT: { // 18
+			assert(isize == 1);
 			output = _builder.CreateSExt(inputs[0], llvm::IntegerType::get(_context, vars[0].size * 8), "sext");
 			break;
 		}
 		case CPUI_INT_ADD: { // 19
+			assert(isize == 2);
 			output = _builder.CreateAdd(inputs[0], inputs[1], "add", false, false);
 			break;
 		}
 		case CPUI_INT_SUB: { // 20
+			assert(isize == 2);
 			output = _builder.CreateSub(inputs[0], inputs[1], "sub", false, false);
 			break;
 		}
@@ -73,6 +78,7 @@ void QuadraTranslator::translate_pcodeop(
 		case CPUI_INT_SBORROW: // 23
 			break;
 		case CPUI_INT_2COMP: { // 24
+			assert(isize == 1);
 			output = _builder.CreateSub(zero(vars[0].size), inputs[0], "2comp", false, false);
 			break;
 		}
@@ -83,14 +89,17 @@ void QuadraTranslator::translate_pcodeop(
 			break;
 		}
 		case CPUI_INT_AND: { // 27
+			assert(isize == 2);
 			output = _builder.CreateAnd(inputs[0], inputs[1], "and");
 			break;
 		}
 		case CPUI_INT_OR: { // 28
+			assert(isize == 2);
 			output = _builder.CreateOr(inputs[0], inputs[1], "or");
 			break;
 		}
 		case CPUI_INT_LEFT: { // 29
+			assert(isize == 2);
 			output = _builder.CreateShl(inputs[0], inputs[1], "left", false, false);
 			break;
 		}
@@ -98,6 +107,7 @@ void QuadraTranslator::translate_pcodeop(
 		case CPUI_INT_SRIGHT: // 31
 			break;
 		case CPUI_INT_MULT: { // 32
+			assert(isize == 2);
 			output = _builder.CreateMul(inputs[0], inputs[1], "mul", false, false);
 			break;
 		}
@@ -107,6 +117,8 @@ void QuadraTranslator::translate_pcodeop(
 		case CPUI_INT_SREM: // 36
 			break;
 		case CPUI_SUBPIECE: { // 63
+			assert(isize == 2);
+			assert(vars[1].getAddr().isConstant());
 			llvm::Value* shifted = _builder.CreateAShr(inputs[0], inputs[1], "subp", false);
 			output = _builder.CreateTrunc(shifted, llvm::IntegerType::get(_context, outvar->size * 8), "subpiece");
 			break;
