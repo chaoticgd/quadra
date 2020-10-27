@@ -9,8 +9,6 @@
 
 namespace fs = std::filesystem;
 
-// Most of this was adapted from sleighexample.cc.
-
 void print_vardata(VarnodeData &data)
 {
 	std::cerr << '(' << data.space->getName() << ',';
