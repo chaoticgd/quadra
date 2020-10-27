@@ -44,30 +44,20 @@ void QuadraTranslator::translate_pcodeop(
 			_builder.CreateRet(value_from_varnode(mips_v0));
 			break;
 		}
-		case CPUI_INT_EQUAL: { // 11
-			break;
-		}
+		case CPUI_INT_EQUAL: // 11
 		case CPUI_INT_NOTEQUAL: { // 12
 			llvm::Value* eq = _builder.CreateICmpEQ(inputs[0], inputs[1], "cmp");
 			output = _builder.CreateNot(eq, "neq");
 			break;
 		}
-		case CPUI_INT_SLESS: { // 13
+		case CPUI_INT_SLESS: // 13
+		case CPUI_INT_SLESSEQUAL: // 14
+		case CPUI_INT_LESS: // 15
+		case CPUI_INT_LESSEQUAL: // 16
+		case CPUI_INT_ZEXT: // 17
 			break;
-		}
-		case CPUI_INT_SLESSEQUAL: { // 14
-			break;
-		}
-		case CPUI_INT_LESS: { // 15
-			break;
-		}
-		case CPUI_INT_LESSEQUAL: { // 16
-			break;
-		}
-		case CPUI_INT_ZEXT: { // 17
-			break;
-		}
 		case CPUI_INT_SEXT: { // 18
+			output = _builder.CreateSExt(inputs[0], llvm::IntegerType::get(_context, vars[0].size * 8), "sext");
 			break;
 		}
 		case CPUI_INT_ADD: { // 19
@@ -78,15 +68,10 @@ void QuadraTranslator::translate_pcodeop(
 			output = _builder.CreateSub(inputs[0], inputs[1], "sub", false, false);
 			break;
 		}
-		case CPUI_INT_CARRY: { // 21
+		case CPUI_INT_CARRY: // 21
+		case CPUI_INT_SCARRY: // 22
+		case CPUI_INT_SBORROW: // 23
 			break;
-		}
-		case CPUI_INT_SCARRY: { // 22
-			break;
-		}
-		case CPUI_INT_SBORROW: { // 23
-			break;
-		}
 		case CPUI_INT_2COMP: { // 24
 			output = _builder.CreateSub(zero(vars[0].size), inputs[0], "2comp", false, false);
 			break;
@@ -107,6 +92,23 @@ void QuadraTranslator::translate_pcodeop(
 		}
 		case CPUI_INT_LEFT: { // 29
 			output = _builder.CreateShl(inputs[0], inputs[1], "left", false, false);
+			break;
+		}
+		case CPUI_INT_RIGHT: // 30
+		case CPUI_INT_SRIGHT: // 31
+			break;
+		case CPUI_INT_MULT: { // 32
+			output = _builder.CreateMul(inputs[0], inputs[1], "mul", false, false);
+			break;
+		}
+		case CPUI_INT_DIV: // 33
+		case CPUI_INT_SDIV: // 34
+		case CPUI_INT_REM: // 35
+		case CPUI_INT_SREM: // 36
+			break;
+		case CPUI_SUBPIECE: { // 63
+			llvm::Value* shifted = _builder.CreateAShr(inputs[0], inputs[1], "subp", false);
+			output = _builder.CreateTrunc(shifted, llvm::IntegerType::get(_context, outvar->size * 8), "subpiece");
 			break;
 		}
 	}
