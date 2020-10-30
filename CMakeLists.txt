@@ -37,16 +37,16 @@ include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 llvm_map_components_to_libnames(llvm_libs core support)
 
-# Build SLEIGH library
+# Build decompiler library
 add_custom_command(
-	OUTPUT ${DECOMPILER_SOURCE_DIR}/decompile/cpp/libsla.a
-	COMMAND make libsla.a
+	OUTPUT ${DECOMPILER_SOURCE_DIR}/decompile/cpp/libdecomp.a
+	COMMAND make libdecomp.a
 	WORKING_DIRECTORY ${DECOMPILER_SOURCE_DIR}/decompile/cpp
 )
 
 add_custom_target(
 	sleigh_library
-	DEPENDS ${DECOMPILER_SOURCE_DIR}/decompile/cpp/libsla.a
+	DEPENDS ${DECOMPILER_SOURCE_DIR}/decompile/cpp/libdecomp.a
 )
 
 # Build SLEIGH compiler
@@ -63,7 +63,7 @@ add_custom_target(
 
 # Build quadra
 include_directories(${DECOMPILER_SOURCE_DIR})
-target_link_libraries(quadra ${DECOMPILER_SOURCE_DIR}/decompile/cpp/libsla.a ${llvm_libs})
+target_link_libraries(quadra ${DECOMPILER_SOURCE_DIR}/decompile/cpp/libdecomp.a ${llvm_libs})
 add_dependencies(quadra sleigh_library sleigh_compiler)
 if(UNIX)
 	target_link_libraries(quadra stdc++fs)
