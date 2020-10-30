@@ -9,25 +9,10 @@ add_executable(quadra
 	src/main.cpp
 	src/elf_loader.cpp
 	src/translator.cpp
+	src/quadra_architecture.cpp
 )
 
-# Download Ghidra
-include(FetchContent)
-FetchContent_Declare(
-	ghidra
-	GIT_REPOSITORY https://github.com/NationalSecurityAgency/ghidra.git
-	GIT_TAG        f7f366b261589a65696c17852812566b9e6659bb
-)
-FetchContent_GetProperties(ghidra)
-if(NOT ghidra_POPULATED)
-	FetchContent_Populate(ghidra)
-	if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/processors")
-		file(COPY ${ghidra_SOURCE_DIR}/Ghidra/Processors DESTINATION ${CMAKE_CURRENT_LIST_DIR})
-		file(RENAME ${CMAKE_CURRENT_LIST_DIR}/Processors ${CMAKE_CURRENT_LIST_DIR}/processors)
-	endif()
-endif()
-
-set(DECOMPILER_SOURCE_DIR "${ghidra_SOURCE_DIR}/Ghidra/Features/Decompiler/src")
+set(DECOMPILER_SOURCE_DIR "${GHIDRA_DIR}/Ghidra/Features/Decompiler/src")
 
 # LLVM
 find_package(LLVM REQUIRED CONFIG)
