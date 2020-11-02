@@ -167,12 +167,6 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 		fprintf(stderr, "warning: Unimplemented or bad pcodeop!!!\n");
 	}
 }
-void print_var(const Varnode& var)
-{
-	std::cerr << '(' << var.getSpace()->getName() << ',';
-	var.getSpace()->printOffset(std::cerr, var.getOffset());
-	std::cerr << ',' << dec << var.getSize() << ')';
-}
 
 void QuadraTranslator::print()
 {
