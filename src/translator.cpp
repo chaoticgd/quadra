@@ -1,10 +1,13 @@
 #include "translator.h"
 
+#include <decompile/cpp/funcdata.hh>
+
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Verifier.h> // llvm::outs
 
-QuadraTranslator::QuadraTranslator(QuadraArchitecture* arch)
+QuadraTranslator::QuadraTranslator(QuadraArchitecture* arch, Funcdata* funcdata)
 	: _arch(arch)
+	, _funcdata(funcdata)
 	, _module("quadra", _context)
 	, _builder(_context)
 {
@@ -48,7 +51,6 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 	llvm::Value* output = nullptr;
 	llvm::Type* type = nullptr;
 	llvm::Value* tmp1 = nullptr;
-	
 	switch(op.code()) {
 		case CPUI_COPY: // 1
 			assert(isize == 1);
@@ -68,7 +70,10 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 		case CPUI_RETURN: // 10
 			assert(isize == 1);
 			// HACK!
-			output = _builder.CreateRet(zero(op.getIn(0)->getSize()));//get_input(_arch->translate.getRegister("v0")));
+			tmp1 = get_input(_funcdata->newVarnode(
+				_arch->getSpaceByName("register")->getIndex(),
+				Address(_arch->getSpaceByName("register"), _arch->translate->getRegister("v0").offset)));
+			output = _builder.CreateRet(tmp1);
 			data.emitted_branch = true;
 			break;
 		case CPUI_INT_EQUAL: // 11

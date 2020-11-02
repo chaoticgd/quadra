@@ -15,7 +15,7 @@
 // from that it generates all the necessary LLVM calls.
 class QuadraTranslator {
 public:
-	QuadraTranslator(QuadraArchitecture* arch);
+	QuadraTranslator(QuadraArchitecture* arch, Funcdata* funcdata);
 	
 	void begin_block(const BlockBasic& gblock, llvm::Twine& name);
 	void end_block(const BlockBasic& gblock);
@@ -26,11 +26,13 @@ public:
 private:
 	llvm::BasicBlock* get_block(const FlowBlock* gblock);
 	llvm::Value* get_input(const Varnode* var); // Convert a Ghidra varnode to an LLVM value.
-	llvm::AllocaInst* get_local(const Varnode* var);
+	llvm::AllocaInst* get_local(const Varnode* var); // Create an alloca for a varnode if it doesn't already exist, then return it.
 	llvm::Value* zero(int4 bytes);
 	llvm::Type* int_type(int4 bytes);
 
 	QuadraArchitecture* _arch;
+	Funcdata* _funcdata;
+	
 	llvm::LLVMContext _context;
 	llvm::Module _module;
 	llvm::IRBuilder<> _builder;

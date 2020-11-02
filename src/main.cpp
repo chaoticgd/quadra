@@ -54,7 +54,7 @@ int main(int argc, char** argv)
 		exit(1);
 	}
 	
-	QuadraTranslator pcode_to_llvm(&arch);
+	QuadraTranslator pcode_to_llvm(&arch, &entry_function);
 	
 	const auto blocks = entry_function.getBasicBlocks();
 	for(const FlowBlock* block : blocks.getList()) {
