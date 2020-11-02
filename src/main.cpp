@@ -1,119 +1,111 @@
 #include <iostream>
 #include <filesystem>
 
+#include <decompile/cpp/libdecomp.hh>
 #include <decompile/cpp/loadimage.hh>
-#include <decompile/cpp/sleigh.hh>
+#include <decompile/cpp/database.hh>
+#include <decompile/cpp/funcdata.hh>
+#include <decompile/cpp/flow.hh>
 
+#include "quadra_architecture.h"
 #include "elf_loader.h"
 #include "translator.h"
 
 namespace fs = std::filesystem;
 
-void print_vardata(VarnodeData &data)
-{
-	std::cerr << '(' << data.space->getName() << ',';
-	data.space->printOffset(std::cerr, data.offset);
-	std::cerr << ',' << dec << data.size << ')';
-}
-
-template <typename F>
-void for_each_pcodeop(Sleigh& translator, Address addr, Address last_addr, F callback);
-
-std::string compile_sla_file_if_missing(std::string slaspec_path);
+void disassemble_pcodeop(size_t index, const PcodeOp& op);
+void print_vardata(const Varnode& var);
 
 int main(int argc, char** argv)
 {
-	std::string slaspec_file = argv[1];
-	std::string sla_file = compile_sla_file_if_missing(slaspec_file);
-	
-	ElfLoader loader(argv[2]);
-	
-	ContextInternal context;
-	
-	Sleigh machine_code_to_pcode(&loader, &context);
-	
-	DocumentStorage document_storage;
-	Element* sleigh_root = document_storage.openDocument(sla_file)->getRoot();
-	document_storage.registerTag(sleigh_root);
-	machine_code_to_pcode.initialize(document_storage);
-	
-	uint64_t entry_point = loader.entry_point();
-	uint64_t entry_segment_top = loader.top_of_segment_containing(entry_point);
-	Address addr(machine_code_to_pcode.getDefaultCodeSpace(), entry_point);
-	Address last_addr(machine_code_to_pcode.getDefaultCodeSpace(), entry_segment_top);
-	
-	QuadraTranslator pcode_to_llvm(&machine_code_to_pcode);
-	
-	for_each_pcodeop(machine_code_to_pcode, addr, last_addr, [&](
-		const Address& addr,
-		OpCode opc,
-		VarnodeData* outvar,
-		VarnodeData* vars,
-		int4 isize)
-	{
-		// Print disassembly.
-		if(outvar != nullptr) {
-			print_vardata(*outvar);
-			std::cerr << " = ";
-		}
-		std::cerr << get_opname(opc);
-		for(int4 i = 0; i < isize; i++) {
-			std::cerr << ' ';
-			print_vardata(vars[i]);
-		}
-		std::cerr << endl;
-		
-		// Convert to LLVM IR.
-		pcode_to_llvm.translate_pcodeop(addr, opc, outvar, vars, isize);
-	});
-	
-	pcode_to_llvm.print();
-}
-
-template <typename F>
-void for_each_pcodeop(Sleigh& translator, Address addr, Address last_addr, F callback)
-{
-	class FunPcodeEmit : public PcodeEmit {
-	public:
-		FunPcodeEmit(F callback) : _callback(callback) {}
-
-		void dump(
-			const Address& addr,
-			OpCode opc,
-			VarnodeData* outvar,
-			VarnodeData* vars,
-			int4 isize) override
-		{
-			_callback(addr, opc, outvar, vars, isize);
-		}
-
-	private:
-		F _callback;
-	};
-	
-	FunPcodeEmit emit(callback);
-	while(addr < last_addr) {
-		int4 length = translator.oneInstruction(emit, addr);
-		addr = addr + length;
-	}
-}
-
-std::string compile_sla_file_if_missing(std::string slaspec_path)
-{
-	static const char* SLASPEC_EXTENSION = ".slaspec";
-	if(slaspec_path.find(SLASPEC_EXTENSION) != slaspec_path.size() - strlen(SLASPEC_EXTENSION)) {
-		fprintf(stderr, "error: The provided file is not a .slaspec file.\n");
+	const char* ghidra_dir = getenv("GHIDRA_DIR");
+	if(ghidra_dir == nullptr) {
+		fprintf(stderr, "GHIDRA_DIR enviroment variable required but not provided.\n");
 		exit(1);
 	}
 	
-	std::string sla_path = slaspec_path.substr(0, slaspec_path.size() - 4);
-	if(!fs::exists(sla_path)) {
-		std::string command = "./sleigh_opt " + slaspec_path;
-		if(system(command.c_str()) != 0 || !fs::exists(sla_path)) {
-			fprintf(stderr, "error: Failed to compile provided .slaspec file.\n");
-			exit(1);
-		}
+	startDecompilerLibrary(ghidra_dir);
+	
+	if(argc < 2) {
+		printf("usage: GHIDRA_DIR=/path/to/ghidra ./quadra /path/to/executable\n");
+		exit(1);
+	}
+	const char* binary_path = argv[1];
+	QuadraArchitecture arch(binary_path, "", &std::cerr);
+	DocumentStorage document_storage;
+	try {
+		arch.init(document_storage);
+	} catch(SleighError& err) {
+		fprintf(stderr, "Failed to load SLEIGH specification. Did you forget to compile it?\n");
+		fprintf(stderr, "%s\n", err.explain.c_str());
+		exit(1);
 	}
 	
-	return sla_path;
+	ScopeInternal scope("scope", &arch);
+	uint64_t entry_point = ((ElfLoader*) arch.loader)->entry_point();
+	uint64_t top = ((ElfLoader*) arch.loader)->top_of_segment_containing(entry_point);
+	Address addr(arch.translate->getDefaultCodeSpace(), entry_point);
+	Funcdata entry_function("entry", &scope, addr, 0);
+	
+	// Generate pcode ops and basic blocks.
+	entry_function.followFlow(addr, Address(arch.translate->getDefaultCodeSpace(), top), 10000);
+	if(entry_function.hasBadData()) {
+		fprintf(stderr, "error: Function flowed into bad data!!!\n");
+		exit(1);
+	}
+	
+	QuadraTranslator pcode_to_llvm(&arch);
+	
+	const auto blocks = entry_function.getBasicBlocks();
+	for(const FlowBlock* block : blocks.getList()) {
+		const BlockBasic* basic = dynamic_cast<const BlockBasic*>(block);
+		assert(basic != nullptr); // We're not doing any control flow recovery, this should never happen.
+		
+		char block_name[1024];
+		snprintf(block_name, 1024, "block_%lx", basic->getEntryAddr().getOffset() - entry_function.getAddress().getOffset());
+		fprintf(stderr, "%s:\n", block_name);
+		
+		llvm::Twine block_twine(block_name);
+		pcode_to_llvm.begin_block(*basic, block_twine);
+		Address last_address;
+		uintm first_time = 0;
+		for(auto iter = basic->beginOp(); iter != basic->endOp(); iter++) {
+			const PcodeOp& op = **iter;
+			
+			if(op.getAddr() != last_address) {
+				first_time = op.getTime();
+			}
+			last_address = op.getAddr();
+			
+			disassemble_pcodeop(op.getTime() - first_time, op);
+			pcode_to_llvm.translate_pcodeop(op);
+		}
+		pcode_to_llvm.end_block(*basic);
+	}
+	
+	pcode_to_llvm.print();
+	
+	shutdownDecompilerLibrary(); // Does nothing.
+}
+
+void disassemble_pcodeop(size_t index, const PcodeOp& op)
+{
+	fprintf(stderr, "\t %08lx:%04lx\t", op.getAddr().getOffset(), index);
+	if(op.getOut() != nullptr) {
+		print_vardata(*op.getOut());
+		std::cerr << " = ";
+	}
+	std::cerr << get_opname(op.code());
+	for(int4 i = 0; i < op.numInput(); i++) {
+		std::cerr << ' ';
+		print_vardata(*op.getIn(i));
+	}
+	std::cerr << endl;
+}
+
+void print_vardata(const Varnode& var)
+{
+	std::cerr << '(' << var.getSpace()->getName() << ',';
+	var.getSpace()->printOffset(std::cerr, var.getOffset());
+	std::cerr << ',' << dec << var.getSize() << ')';
 }
