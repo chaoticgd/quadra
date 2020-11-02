@@ -158,13 +158,10 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			break;
 	}
 	
-	if(output != nullptr) {
-		if(op.getOut() != nullptr) {
-			assert(op.getOut()->getSize() * 8 == output->getType()->getScalarSizeInBits());
-			_builder.CreateStore(output, get_local(op.getOut()), false);
-		}
-	} else {
-		fprintf(stderr, "warning: Unimplemented or bad pcodeop!!!\n");
+	assert(output != nullptr && "Unimplemented or bad pcodeop!!!");
+	if(op.getOut() != nullptr) {
+		assert(op.getOut()->getSize() * 8 == output->getType()->getScalarSizeInBits());
+		_builder.CreateStore(output, get_local(op.getOut()), false);
 	}
 }
 
