@@ -49,10 +49,7 @@ int main(int argc, char** argv)
 	
 	// Generate pcode ops and basic blocks.
 	entry_function.followFlow(addr, Address(arch.translate->getDefaultCodeSpace(), top), 10000);
-	if(entry_function.hasBadData()) {
-		fprintf(stderr, "error: Function flowed into bad data!!!\n");
-		exit(1);
-	}
+	assert(!entry_function.hasBadData() && " Function flowed into bad data!!!");
 	
 	QuadraTranslator pcode_to_llvm(&arch, &entry_function);
 	

@@ -35,10 +35,8 @@ void QuadraTranslator::end_block(const BlockBasic& gblock)
 
 void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 {
-	if(_block == nullptr) {
-		fprintf(stderr, "QuadraTranslator::translate_pcodeop called outside a block!!!\n");
-		exit(1);
-	}
+	assert(_block != nullptr && "QuadraTranslator::translate_pcodeop called outside a block!");
+	
 	BlockData& data = _blocks[_block];
 	int4 isize = op.numInput();
 	
