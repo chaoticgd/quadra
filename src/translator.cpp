@@ -55,6 +55,12 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			assert(op.getOut()->getSize() == op.getIn(0)->getSize());
 			output = inputs[0];
 			break;
+		case CPUI_BRANCH: // 4
+			assert(isize == 1);
+			assert(_block->sizeOut() == 1);
+			output = _builder.CreateBr(get_block(_block->getOut(0)));
+			data.emitted_branch = true;
+			break;
 		case CPUI_CBRANCH: // 5
 			assert(isize == 2);
 			assert(_block->sizeOut() == 2);
