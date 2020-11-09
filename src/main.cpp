@@ -51,7 +51,7 @@ int main(int argc, char** argv)
 	entry_function.followFlow(addr, Address(arch.translate->getDefaultCodeSpace(), top), 10000);
 	assert(!entry_function.hasBadData() && " Function flowed into bad data!!!");
 	
-	QuadraTranslator pcode_to_llvm(&arch, &entry_function);
+	QuadraTranslator pcode_to_llvm(&arch);
 	
 	pcode_to_llvm.begin_function(&entry_function);
 	
