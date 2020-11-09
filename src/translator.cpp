@@ -11,8 +11,33 @@ QuadraTranslator::QuadraTranslator(QuadraArchitecture* arch, Funcdata* funcdata)
 	, _module("quadra", _context)
 	, _builder(_context)
 {
+	std::map<VarnodeData, std::string> registers;
+	_arch->translate->getAllRegisters(registers);
+	for(auto& [varnode, _] : registers) {
+		_register_space_size = std::max(_register_space_size, varnode.offset + varnode.size);
+	}
+}
+
+void QuadraTranslator::begin_function(const Funcdata* gfunction)
+{
 	llvm::FunctionType* func_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(_context), false);
 	_function = llvm::Function::Create(func_type, llvm::Function::ExternalLinkage, "main", _module);
+	
+	auto blocks = gfunction->getBasicBlocks().getList();
+	assert(blocks.size() >= 1);
+	_builder.SetInsertPoint(get_block(blocks[0]));
+	
+	auto frame = llvm::ArrayType::get(int_type(1), _register_space_size);
+	llvm::AllocaInst* frame_hack_alloca = _builder.CreateAlloca(frame, nullptr, "registers");
+	
+	_register_space = frame_hack_alloca->getType()->getAddressSpace();
+	auto ptr8_type = llvm::PointerType::get(int_type(1), _register_space);
+	_register_alloca = _builder.CreatePointerCast(frame_hack_alloca, ptr8_type, "");
+}
+
+void QuadraTranslator::end_function()
+{
+	
 }
 
 void QuadraTranslator::begin_block(const BlockBasic& gblock, llvm::Twine& name)
@@ -199,7 +224,15 @@ llvm::Value* QuadraTranslator::get_input(const Varnode* var)
 	return _builder.CreateLoad(get_local(var), "");
 }
 
-llvm::AllocaInst* QuadraTranslator::get_local(const Varnode* var) {
+llvm::Value* QuadraTranslator::get_local(const Varnode* var)
+{
+	if(var->getSpace()->getName() == "register") {
+		auto offset = llvm::ConstantInt::get(_context, llvm::APInt(32, var->getOffset(), false));
+		llvm::Value* ptr8 = _builder.CreateGEP(_register_alloca, offset, "");
+		auto ptr_type = llvm::PointerType::get(int_type(var->getSize()), _register_space);
+		return _builder.CreatePointerCast(ptr8, ptr_type, "");
+	}
+	
 	auto compare_varnodes = [](const Varnode* l, const Varnode* r) {
 		return l->getSpace()->getIndex() == r->getSpace()->getIndex()
 			&& l->getOffset() == r->getOffset()

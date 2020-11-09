@@ -53,6 +53,8 @@ int main(int argc, char** argv)
 	
 	QuadraTranslator pcode_to_llvm(&arch, &entry_function);
 	
+	pcode_to_llvm.begin_function(&entry_function);
+	
 	const auto blocks = entry_function.getBasicBlocks();
 	for(const FlowBlock* block : blocks.getList()) {
 		const BlockBasic* basic = dynamic_cast<const BlockBasic*>(block);
@@ -80,6 +82,7 @@ int main(int argc, char** argv)
 		pcode_to_llvm.end_block(*basic);
 	}
 	
+	pcode_to_llvm.end_function();
 	pcode_to_llvm.print();
 	
 	shutdownDecompilerLibrary(); // Does nothing.
