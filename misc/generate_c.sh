@@ -1,7 +1,7 @@
 misc_dir=$(dirname $0)
 echo "${misc_dir}"
 gcc "${misc_dir}/generate_c.c" -o "${misc_dir}/generate_c"
-${misc_dir}/generate_c > /tmp/quadra_genc.c
+${misc_dir}/generate_c $@ > /tmp/quadra_genc.c
 gcc /tmp/quadra_genc.c -o /tmp/quadra_genc_native
 /tmp/quadra_genc_native
 target_code=$(echo $?)

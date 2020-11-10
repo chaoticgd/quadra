@@ -12,9 +12,14 @@ int depth = 0;
 int iterator_count = 0;
 int last_assigned = 0;
 
-int main()
+int main(int argc, char** argv)
 {
-	srand(time(NULL));
+	int seed = time(NULL);
+	if(argc == 2) {
+		seed = atoi(argv[1]);
+	}
+	fprintf(stderr, "seed is: %d\n", seed);
+	srand(seed);
 	
 	printf("#ifdef __x86_64__\n");
 	printf("int main() {\n");
