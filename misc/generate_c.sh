@@ -8,4 +8,10 @@ ee-gcc /tmp/quadra_genc.c -o /tmp/quadra_genc_mips -nostdlib -w -std=c99 -O3
 ${misc_dir}/../quadra /tmp/quadra_genc_mips > /tmp/quadra_genc_llvm.ll
 clang /tmp/quadra_genc_llvm.ll -o /tmp/quadra_genc_translated
 /tmp/quadra_genc_translated
-echo "exit code: $?, target code: ${target_code}"
+exit_code=$?
+echo "exit code: ${exit_code}, target code: ${target_code}"
+if [ "$exit_code" == "$target_code" ]; then
+	exit 0
+else
+	exit 1
+fi
