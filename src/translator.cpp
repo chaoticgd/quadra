@@ -123,6 +123,8 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			data.emitted_branch = true;
 			break;
 		case CPUI_INT_EQUAL: // 11
+			tmp1 = _builder.CreateICmpEQ(inputs[0], inputs[1], "");
+			output = _builder.CreateZExt(tmp1, int_type(1), ""); // i1 -> i8
 			break;
 		case CPUI_INT_NOTEQUAL: // 12
 			assert(isize == 2);
@@ -196,12 +198,15 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 		case CPUI_INT_REM: // 35
 		case CPUI_INT_SREM: // 36
 			break;
-		case CPUI_SUBPIECE: // 63
+		case CPUI_SUBPIECE: {// 63
 			assert(isize == 2);
 			assert(op.getIn(1)->getAddr().isConstant());
-			tmp1 = _builder.CreateAShr(inputs[0], inputs[1], "", false);
-			output = _builder.CreateTrunc(tmp1, int_type(op.getOut()->getSize()), "");
+			llvm::APInt shift_val(op.getIn(0)->getSize() * 8, op.getIn(0)->getOffset() * 8, false);
+			llvm::Value* shift = llvm::ConstantInt::get(_context, shift_val);
+			llvm::Value* shifted = _builder.CreateAShr(inputs[0], shift, "", false);
+			output = _builder.CreateTrunc(shifted, int_type(op.getOut()->getSize()), "");
 			break;
+		}
 	}
 	
 	assert(output != nullptr && "Unimplemented or bad pcodeop!!!");
