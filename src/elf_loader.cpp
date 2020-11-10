@@ -60,7 +60,7 @@ ElfLoader::ElfLoader(std::string elf_path)
 
 std::string ElfLoader::getArchType() const
 {
-	return "MIPS:LE:64:default"; // HACK!
+	return "r5900:LE:32:default"; // HACK!
 }
 
 void ElfLoader::adjustVma(long adjust)
