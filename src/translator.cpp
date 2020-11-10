@@ -13,7 +13,9 @@ QuadraTranslator::QuadraTranslator(QuadraArchitecture* arch)
 	std::map<VarnodeData, std::string> registers;
 	_arch->translate->getAllRegisters(registers);
 	for(auto& [varnode, _] : registers) {
-		_register_space_size = std::max(_register_space_size, varnode.offset + varnode.size);
+		if(varnode.space->getName() == "register") {
+			_register_space_size = std::max(_register_space_size, varnode.offset + varnode.size);
+		}
 	}
 }
 
