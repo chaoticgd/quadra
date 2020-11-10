@@ -21,6 +21,7 @@ int main(int argc, char** argv)
 	fprintf(stderr, "seed is: %d\n", seed);
 	srand(seed);
 	
+	printf("#pragma GCC diagnostic ignored \"-Woverflow\"\n");
 	printf("#ifdef __x86_64__\n");
 	printf("int main() {\n");
 	printf("#else\n");
