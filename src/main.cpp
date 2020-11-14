@@ -57,6 +57,8 @@ int main(int argc, char** argv)
 		const auto blocks = function.ghidra->getBasicBlocks();
 		pcode_to_llvm.begin_function(std::move(function));
 		
+		fprintf(stderr, "%s() {\n", function.llvm->getName().data());
+		
 		for(const FlowBlock* block : blocks.getList()) {
 			const BlockBasic* basic = dynamic_cast<const BlockBasic*>(block);
 			assert(basic != nullptr); // We're not doing any control flow recovery, this should never happen.
@@ -84,6 +86,8 @@ int main(int argc, char** argv)
 		}
 		
 		pcode_to_llvm.end_function();
+		
+		fprintf(stderr, "}\n");
 	}
 	
 	pcode_to_llvm.print();
