@@ -41,48 +41,51 @@ int main(int argc, char** argv)
 		exit(1);
 	}
 	
-	ScopeInternal scope("scope", &arch);
-	uint64_t entry_point = ((ElfLoader*) arch.loader)->entry_point();
-	uint64_t top = ((ElfLoader*) arch.loader)->top_of_segment_containing(entry_point);
-	Address addr(arch.translate->getDefaultCodeSpace(), entry_point);
-	Funcdata entry_function("entry", &scope, addr, 0);
-	
-	// Generate pcode ops and basic blocks.
-	entry_function.followFlow(addr, Address(arch.translate->getDefaultCodeSpace(), top), 10000);
-	assert(!entry_function.hasBadData() && " Function flowed into bad data!!!");
-	
 	QuadraTranslator pcode_to_llvm(&arch);
 	
-	pcode_to_llvm.begin_function(&entry_function);
+	uint64_t entry_point = ((ElfLoader*) arch.loader)->entry_point();
+	Address entry_point_addr(arch.translate->getDefaultCodeSpace(), entry_point);
 	
-	const auto blocks = entry_function.getBasicBlocks();
-	for(const FlowBlock* block : blocks.getList()) {
-		const BlockBasic* basic = dynamic_cast<const BlockBasic*>(block);
-		assert(basic != nullptr); // We're not doing any control flow recovery, this should never happen.
+	// Create the Ghidra/LLVM function objects.
+	pcode_to_llvm.get_function(entry_point_addr, "main");
+	
+	while(pcode_to_llvm.discovered_functions.size() > 0) {
+		Address address = pcode_to_llvm.discovered_functions.begin()->first;
+		auto node_handle = pcode_to_llvm.discovered_functions.extract(address);
+		QuadraFunction function = std::move(node_handle.mapped());
 		
-		char block_name[1024];
-		snprintf(block_name, 1024, "block_%lx", basic->getEntryAddr().getOffset() - entry_function.getAddress().getOffset());
-		fprintf(stderr, "%s:\n", block_name);
+		const auto blocks = function.ghidra->getBasicBlocks();
+		pcode_to_llvm.begin_function(std::move(function));
 		
-		llvm::Twine block_twine(block_name);
-		pcode_to_llvm.begin_block(*basic, block_twine);
-		Address last_address;
-		uintm first_time = 0;
-		for(auto iter = basic->beginOp(); iter != basic->endOp(); iter++) {
-			const PcodeOp& op = **iter;
+		for(const FlowBlock* block : blocks.getList()) {
+			const BlockBasic* basic = dynamic_cast<const BlockBasic*>(block);
+			assert(basic != nullptr); // We're not doing any control flow recovery, this should never happen.
 			
-			if(op.getAddr() != last_address) {
-				first_time = op.getTime();
+			char block_name[1024];
+			snprintf(block_name, 1024, "block_%lx", basic->getEntryAddr().getOffset() - address.getOffset());
+			fprintf(stderr, "%s:\n", block_name);
+			
+			llvm::Twine block_twine(block_name);
+			pcode_to_llvm.begin_block(basic, block_twine);
+			Address last_address;
+			uintm first_time = 0;
+			for(auto iter = basic->beginOp(); iter != basic->endOp(); iter++) {
+				const PcodeOp& op = **iter;
+				
+				if(op.getAddr() != last_address) {
+					first_time = op.getTime();
+				}
+				last_address = op.getAddr();
+				
+				disassemble_pcodeop(op.getTime() - first_time, op);
+				pcode_to_llvm.translate_pcodeop(op);
 			}
-			last_address = op.getAddr();
-			
-			disassemble_pcodeop(op.getTime() - first_time, op);
-			pcode_to_llvm.translate_pcodeop(op);
+			pcode_to_llvm.end_block();
 		}
-		pcode_to_llvm.end_block(*basic);
+		
+		pcode_to_llvm.end_function();
 	}
 	
-	pcode_to_llvm.end_function();
 	pcode_to_llvm.print();
 	
 	shutdownDecompilerLibrary(); // Does nothing.

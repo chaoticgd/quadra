@@ -19,59 +19,57 @@ QuadraTranslator::QuadraTranslator(QuadraArchitecture* arch)
 	}
 }
 
-void QuadraTranslator::begin_function(Funcdata* gfunction)
+void QuadraTranslator::begin_function(QuadraFunction function)
 {
-	_gfunction = gfunction;
+	_function = std::move(function);
 	
-	llvm::FunctionType* func_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(_context), false);
-	_lfunction = llvm::Function::Create(func_type, llvm::Function::ExternalLinkage, "main", _module);
-	
-	auto blocks = gfunction->getBasicBlocks().getList();
+	auto blocks = _function.ghidra->getBasicBlocks().getList();
 	assert(blocks.size() >= 1);
-	_builder.SetInsertPoint(get_block(blocks[0]));
+	_builder.SetInsertPoint(get_block(blocks[0])->llvm);
 	
 	auto registers_type = llvm::ArrayType::get(int_type(1), _register_space_size);
 	llvm::AllocaInst* registers_alloca = _builder.CreateAlloca(registers_type, nullptr, "registers");
 	_register_space = registers_alloca->getType()->getAddressSpace();
 	auto register_ptr_type = llvm::PointerType::get(int_type(1), _register_space);
-	_register_alloca = _builder.CreatePointerCast(registers_alloca, register_ptr_type, "");
+	_function.register_alloca = _builder.CreatePointerCast(registers_alloca, register_ptr_type, "");
 	
 	// HACK: Stack frame size fixed at 0x2000.
 	auto stack_type = llvm::ArrayType::get(int_type(1), 0x2000);
 	llvm::AllocaInst* stack_alloca = _builder.CreateAlloca(stack_type, nullptr, "stackframe");
-	_stack_space = stack_alloca->getType()->getAddressSpace();
-	auto stack_ptr_type = llvm::PointerType::get(int_type(1), _stack_space);
-	_stack_alloca = _builder.CreatePointerCast(stack_alloca, stack_ptr_type, "");
+	_function.stack_space = stack_alloca->getType()->getAddressSpace();
+	auto stack_ptr_type = llvm::PointerType::get(int_type(1), _function.stack_space);
+	_function.stack_alloca = _builder.CreatePointerCast(stack_alloca, stack_ptr_type, "");
 }
 
 void QuadraTranslator::end_function()
 {
-	
+	Address address = _function.ghidra->getAddress();
+	translated_functions.emplace(address, std::move(_function));
 }
 
-void QuadraTranslator::begin_block(const BlockBasic& gblock, llvm::Twine& name)
+void QuadraTranslator::begin_block(const BlockBasic* gblock, llvm::Twine& name)
 {
-	_block = &gblock;
-	llvm::BasicBlock* lblock = get_block(&gblock);
+	_gblock = gblock;
+	llvm::BasicBlock* lblock = get_block(gblock)->llvm;
 	lblock->setName(name);
 	_builder.SetInsertPoint(lblock);
 }
 
-void QuadraTranslator::end_block(const BlockBasic& gblock)
+void QuadraTranslator::end_block()
 {
-	BlockData& block = _blocks[&gblock];
+	QuadraBlock& block = _blocks[_gblock];
 	if(!block.emitted_branch) {
-		assert(gblock.sizeOut() == 1);
-		_builder.CreateBr(get_block(gblock.getOut(0)));
+		assert(_gblock->sizeOut() == 1);
+		_builder.CreateBr(get_block(_gblock->getOut(0))->llvm);
 	}
-	_block = nullptr;
+	_gblock = nullptr;
 }
 
 void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 {
-	assert(_block != nullptr && "QuadraTranslator::translate_pcodeop called outside a block!");
+	assert(_gblock != nullptr && "QuadraTranslator::translate_pcodeop called outside a block!");
 	
-	BlockData& data = _blocks[_block];
+	QuadraBlock& block = _blocks[_gblock];
 	int4 isize = op.numInput();
 	
 	llvm::Value* inputs[3];
@@ -101,28 +99,40 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			break;
 		case CPUI_BRANCH: // 4
 			assert(isize == 1);
-			assert(_block->sizeOut() == 1);
-			output = _builder.CreateBr(get_block(_block->getOut(0)));
-			data.emitted_branch = true;
+			assert(_gblock->sizeOut() == 1);
+			output = _builder.CreateBr(get_block(_gblock->getOut(0))->llvm);
+			block.emitted_branch = true;
 			break;
 		case CPUI_CBRANCH: // 5
 			assert(isize == 2);
-			assert(_block->sizeOut() == 2);
+			assert(_gblock->sizeOut() == 2);
 			tmp1 = _builder.CreateICmpNE(inputs[1], zero(op.getIn(1)->getSize()));
 			output = _builder.CreateCondBr(
 				tmp1,
-				get_block(_block->getTrueOut()),
-				get_block(_block->getFalseOut()));
-			data.emitted_branch = true;
+				get_block(_gblock->getTrueOut())->llvm,
+				get_block(_gblock->getFalseOut())->llvm);
+			block.emitted_branch = true;
 			break;
+		case CPUI_CALL: { // 7
+			assert(isize == 1);
+			FuncCallSpecs* call = _function.ghidra->getCallSpecs(&op);
+			Address callee_addr = call->getEntryAddress();
+			QuadraFunction* callee = get_function(callee_addr, nullptr);
+			llvm::Value* return_value = _builder.CreateCall(callee->llvm, {}, "", nullptr);
+			llvm::Value* v0 = get_local(_function.ghidra->newVarnode(
+				_arch->getSpaceByName("register")->getIndex(),
+				Address(_arch->getSpaceByName("register"), _arch->translate->getRegister("v0").offset)));
+			output = _builder.CreateStore(return_value, v0);
+			break;
+		}
 		case CPUI_RETURN: // 10
 			assert(isize == 1);
 			// HACK!
-			tmp1 = get_input(_gfunction->newVarnode(
+			tmp1 = get_input(_function.ghidra->newVarnode(
 				_arch->getSpaceByName("register")->getIndex(),
 				Address(_arch->getSpaceByName("register"), _arch->translate->getRegister("v0").offset)));
 			output = _builder.CreateRet(tmp1);
-			data.emitted_branch = true;
+			block.emitted_branch = true;
 			break;
 		case CPUI_INT_EQUAL: // 11
 			tmp1 = _builder.CreateICmpEQ(inputs[0], inputs[1], "");
@@ -223,23 +233,57 @@ void QuadraTranslator::print()
 	_module.print(llvm::outs(), nullptr);
 }
 
-llvm::BasicBlock* QuadraTranslator::get_block(const FlowBlock* gblock)
+QuadraFunction* QuadraTranslator::get_function(Address address, const char* name)
+{
+	if(_function.ghidra != nullptr && _function.ghidra->getAddress() == address) {
+		return &_function;
+	}
+	
+	auto discovered_iter = discovered_functions.find(address);
+	if(discovered_iter != discovered_functions.end()) {
+		return &discovered_iter->second;
+	}
+	
+	auto translated_iter = translated_functions.find(address);
+	if(translated_iter != translated_functions.end()) {
+		return &translated_iter->second;
+	}
+	
+	std::stringstream name_ss;
+	if(name != nullptr) {
+		name_ss << name;
+	} else {
+		name_ss << "func_" << std::hex << address.getOffset();
+	}
+	
+	QuadraFunction& function = discovered_functions[address];
+	function.ghidra = std::make_unique<Funcdata>(name_ss.str(), _arch->symboltab->getGlobalScope(), address, 0);
+	
+	// Generate pcode ops, basic blocks and call specs.
+	function.ghidra->startProcessing();
+	assert(!function.ghidra->hasBadData() && "Function flowed into bad data!!!");
+	
+	llvm::FunctionType* func_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(_context), false);
+	function.llvm = llvm::Function::Create(func_type, llvm::Function::ExternalLinkage, name_ss.str(), _module);
+	return &function;
+}
+
+QuadraBlock* QuadraTranslator::get_block(const FlowBlock* gblock)
 {
 	const BlockBasic* basic_gblock = dynamic_cast<const BlockBasic*>(gblock);
 	assert(basic_gblock != nullptr);
 	auto iter = _blocks.find(basic_gblock);
 	if(iter != _blocks.end()) {
-		return iter->second.lblock;
+		return &iter->second;
 	}
-	llvm::BasicBlock* lblock = llvm::BasicBlock::Create(_context, "", _lfunction);
-	_blocks[basic_gblock] = { lblock };
-	return lblock;
+	
+	QuadraBlock& block = _blocks[basic_gblock];
+	block.llvm = llvm::BasicBlock::Create(_context, "", _function.llvm, block.llvm);
+	return &block;
 }
 
 llvm::Value* QuadraTranslator::get_input(const Varnode* var)
 {
-	BlockData& data = _blocks[_block];
-	
 	llvm::Type* type = int_type(var->getSize());
 	if(var->getAddr().isConstant()) {
 		return llvm::ConstantInt::get(type, llvm::APInt(var->getSize() * 8, var->getOffset(), false));
@@ -257,7 +301,7 @@ llvm::Value* QuadraTranslator::get_local(const Varnode* var)
 {
 	if(var->getSpace()->getName() == "register") {
 		auto offset = llvm::ConstantInt::get(_context, llvm::APInt(32, var->getOffset(), false));
-		llvm::Value* ptr8 = _builder.CreateGEP(_register_alloca, offset, "");
+		llvm::Value* ptr8 = _builder.CreateGEP(_function.register_alloca, offset, "");
 		auto ptr_type = llvm::PointerType::get(int_type(var->getSize()), _register_space);
 		return _builder.CreatePointerCast(ptr8, ptr_type, "");
 	}
@@ -269,7 +313,7 @@ llvm::Value* QuadraTranslator::get_local(const Varnode* var)
 	};
 	
 	llvm::AllocaInst* local = nullptr;
-	for(auto& [current_var, alloca] : _locals) {
+	for(auto& [current_var, alloca] : _function.locals) {
 		bool cmp = *current_var == *var;
 		if(compare_varnodes(current_var, var)) {
 			local = alloca;
@@ -278,8 +322,8 @@ llvm::Value* QuadraTranslator::get_local(const Varnode* var)
 	
 	if(local == nullptr) {
 		llvm::IRBuilder<> alloca_builder(
-			&_lfunction->getEntryBlock(),
-			_lfunction->getEntryBlock().begin());
+			&_function.llvm->getEntryBlock(),
+			_function.llvm->getEntryBlock().begin());
 		std::stringstream name;
 		name << _arch->translate->getRegisterName(
 			var->getSpace(), var->getOffset(), var->getSize());
@@ -289,7 +333,7 @@ llvm::Value* QuadraTranslator::get_local(const Varnode* var)
 		name << "l_0x" << std::hex << var->getOffset();
 		name << "_" << var->getSpace()->getName();
 		local = alloca_builder.CreateAlloca(int_type(var->getSize()), 0, name.str());
-		_locals[var] = local;
+		_function.locals[var] = local;
 	}
 	
 	return local;
@@ -297,8 +341,8 @@ llvm::Value* QuadraTranslator::get_local(const Varnode* var)
 
 llvm::Value* QuadraTranslator::get_stack_memory(llvm::Value* offset, int4 size_bytes)
 {
-	llvm::Value* ptr = _builder.CreateGEP(_stack_alloca, offset, "");
-	auto ptr_type = llvm::PointerType::get(int_type(size_bytes), _stack_space);
+	llvm::Value* ptr = _builder.CreateGEP(_function.stack_alloca, offset, "");
+	auto ptr_type = llvm::PointerType::get(int_type(size_bytes), _function.stack_space);
 	return _builder.CreatePointerCast(ptr, ptr_type, "");
 }
 
