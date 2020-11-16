@@ -210,6 +210,17 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 		case CPUI_INT_REM: // 35
 		case CPUI_INT_SREM: // 36
 			break;
+		case CPUI_BOOL_NEGATE: // 37
+			assert(isize == 1);
+			assert(op.getOut()->getSize() == 1);
+			assert(op.getIn(0)->getSize() == 1);
+			tmp1 = _builder.CreateICmpEQ(inputs[0], zero(1), "");
+			output = _builder.CreateZExt(tmp1, int_type(1), "");
+			break;
+		case CPUI_BOOL_XOR: // 38
+		case CPUI_BOOL_AND: // 39
+		case CPUI_BOOL_OR: // 40
+			break;
 		case CPUI_SUBPIECE: {// 63
 			assert(isize == 2);
 			assert(op.getIn(1)->getAddr().isConstant());
