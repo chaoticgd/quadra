@@ -203,6 +203,10 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			output = _builder.CreateShl(inputs[0], inputs[1], "", false, false);
 			break;
 		case CPUI_INT_RIGHT: // 30
+			assert(isize == 2);
+			assert(op.getOut()->getSize() == op.getIn(0)->getSize());
+			output = _builder.CreateLShr(inputs[0], inputs[1], "", false);
+			break;
 		case CPUI_INT_SRIGHT: // 31
 			break;
 		case CPUI_INT_MULT: // 32
