@@ -223,7 +223,12 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			output = _builder.CreateSDiv(inputs[0], inputs[1]);
 			break;
 		case CPUI_INT_REM: // 35
+			assert(isize == 2);
+			output = _builder.CreateURem(inputs[0], inputs[1]);
+			break;
 		case CPUI_INT_SREM: // 36
+			assert(isize == 2);
+			output = _builder.CreateSRem(inputs[0], inputs[1]);
 			break;
 		case CPUI_BOOL_NEGATE: // 37
 			assert(isize == 1);
