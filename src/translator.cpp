@@ -125,6 +125,11 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			output = _builder.CreateStore(return_value, v0);
 			break;
 		}
+		case CPUI_CALLOTHER: // 9
+			// HACK: For some reason my MIPS version of gcc is emitting a BREAK
+			// instruction, which gets translated into a CALLOTHER. So lets
+			// ignore that for now.
+			return;
 		case CPUI_RETURN: // 10
 			assert(isize == 1);
 			// HACK!
