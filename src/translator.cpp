@@ -215,7 +215,13 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			output = _builder.CreateMul(inputs[0], inputs[1], "", false, false);
 			break;
 		case CPUI_INT_DIV: // 33
+			assert(isize == 2);
+			output = _builder.CreateUDiv(inputs[0], inputs[1]);
+			break;
 		case CPUI_INT_SDIV: // 34
+			assert(isize == 2);
+			output = _builder.CreateSDiv(inputs[0], inputs[1]);
+			break;
 		case CPUI_INT_REM: // 35
 		case CPUI_INT_SREM: // 36
 			break;
