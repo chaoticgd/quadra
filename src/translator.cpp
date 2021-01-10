@@ -290,7 +290,11 @@ QuadraFunction* QuadraTranslator::get_function(Address address, const char* name
 	_arch->allacts.getCurrent()->apply(*function.ghidra.get());
 	assert(!function.ghidra->hasBadData() && "Function flowed into bad data!!!");
 	
-	llvm::FunctionType* func_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(_context), false);
+	PcodeOp* return_op = function.ghidra->getFirstReturnOp();
+	assert(return_op->numInput() >= 2);
+	Varnode* return_var = return_op->getIn(1);
+	llvm::IntegerType* return_type = llvm::IntegerType::get(_context, return_var->getSize() * 8);
+	llvm::FunctionType* func_type = llvm::FunctionType::get(return_type, false);
 	function.llvm = llvm::Function::Create(func_type, llvm::Function::ExternalLinkage, name_ss.str(), _module);
 	return &function;
 }
