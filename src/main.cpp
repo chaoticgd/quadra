@@ -6,6 +6,9 @@
 #include <decompile/cpp/database.hh>
 #include <decompile/cpp/funcdata.hh>
 #include <decompile/cpp/flow.hh>
+#include <decompile/cpp/coreaction.hh>
+#include <decompile/cpp/double.hh>
+#include <decompile/cpp/condexe.hh>
 
 #include "quadra_architecture.h"
 #include "elf_loader.h"
@@ -13,7 +16,7 @@
 
 namespace fs = std::filesystem;
 
-void disassemble_pcodeop(size_t index, const PcodeOp& op);
+void disassemble_pcodeop(int4 index, const PcodeOp& op);
 void print_vardata(const Varnode& var);
 
 int main(int argc, char** argv)
@@ -41,6 +44,10 @@ int main(int argc, char** argv)
 		exit(1);
 	}
 	
+	arch.allacts = ActionDatabase();
+	universal_action(&arch);
+	arch.allacts.setCurrent("decompile");
+	
 	QuadraTranslator pcode_to_llvm(&arch);
 	
 	uint64_t entry_point = ((ElfLoader*) arch.loader)->entry_point();
@@ -54,10 +61,10 @@ int main(int argc, char** argv)
 		auto node_handle = pcode_to_llvm.discovered_functions.extract(address);
 		QuadraFunction function = std::move(node_handle.mapped());
 		
+		fprintf(stderr, "%s() {\n", function.llvm->getName().data());
+		
 		const auto blocks = function.ghidra->getBasicBlocks();
 		pcode_to_llvm.begin_function(std::move(function));
-		
-		fprintf(stderr, "%s() {\n", function.llvm->getName().data());
 		
 		for(const FlowBlock* block : blocks.getList()) {
 			const BlockBasic* basic = dynamic_cast<const BlockBasic*>(block);
@@ -95,9 +102,10 @@ int main(int argc, char** argv)
 	shutdownDecompilerLibrary(); // Does nothing.
 }
 
-void disassemble_pcodeop(size_t index, const PcodeOp& op)
+void disassemble_pcodeop(int4 index, const PcodeOp& op)
 {
-	fprintf(stderr, "\t %08lx:%04lx\t", op.getAddr().getOffset(), index);
+	fprintf(stderr, "\t %08lx:%c%04x\t", op.getAddr().getOffset(),
+		(index < 0) ? '-' : '+', (index < 0) ? (-index) : index);
 	if(op.getOut() != nullptr) {
 		print_vardata(*op.getOut());
 		std::cerr << " = ";

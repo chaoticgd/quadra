@@ -114,15 +114,10 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			block.emitted_branch = true;
 			break;
 		case CPUI_CALL: { // 7
-			assert(isize == 1);
 			FuncCallSpecs* call = _function.ghidra->getCallSpecs(&op);
 			Address callee_addr = call->getEntryAddress();
 			QuadraFunction* callee = get_function(callee_addr, nullptr);
-			llvm::Value* return_value = _builder.CreateCall(callee->llvm, {}, "", nullptr);
-			llvm::Value* v0 = get_local(_function.ghidra->newVarnode(
-				_arch->getSpaceByName("register")->getIndex(),
-				Address(_arch->getSpaceByName("register"), _arch->translate->getRegister("v0").offset)));
-			output = _builder.CreateStore(return_value, v0);
+			output = _builder.CreateCall(callee->llvm, {}, "", nullptr); 
 			break;
 		}
 		case CPUI_CALLOTHER: // 9
@@ -131,12 +126,8 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			// ignore that for now.
 			return;
 		case CPUI_RETURN: // 10
-			assert(isize == 1);
-			// HACK!
-			tmp1 = get_input(_function.ghidra->newVarnode(
-				_arch->getSpaceByName("register")->getIndex(),
-				Address(_arch->getSpaceByName("register"), _arch->translate->getRegister("v0").offset)));
-			output = _builder.CreateRet(tmp1);
+			assert(op.numInput() >= 2);
+			output = _builder.CreateRet(inputs[1]);
 			block.emitted_branch = true;
 			break;
 		case CPUI_INT_EQUAL: // 11
@@ -295,8 +286,8 @@ QuadraFunction* QuadraTranslator::get_function(Address address, const char* name
 	QuadraFunction& function = discovered_functions[address];
 	function.ghidra = std::make_unique<Funcdata>(name_ss.str(), _arch->symboltab->getGlobalScope(), address, 0);
 	
-	// Generate pcode ops, basic blocks and call specs.
-	function.ghidra->startProcessing();
+	assert(_arch->allacts.getCurrent());
+	_arch->allacts.getCurrent()->apply(*function.ghidra.get());
 	assert(!function.ghidra->hasBadData() && "Function flowed into bad data!!!");
 	
 	llvm::FunctionType* func_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(_context), false);
