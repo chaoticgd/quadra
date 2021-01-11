@@ -27,6 +27,7 @@ int main(int argc, char** argv)
 	printf("#else\n");
 	printf("int _start() {\n");
 	printf("#endif\n");
+	printf("int divtemp;");
 	locals = 1 + rand() % 32;
 	for(int i = 0; i < locals; i++) {
 		printf("int l_%d = %d;\n", i, rand());
@@ -121,11 +122,11 @@ void gen_expr()
 				break;
 			}
 			case 3: {
-				printf("(");
+				printf("(divtemp=(");
 				gen_expr();
-				printf(")/(");
+				printf("), (");
 				gen_expr();
-				printf(")");
+				printf(")/(divtemp==0?1:divtemp))");
 				break;
 			}
 		}
