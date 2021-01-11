@@ -17,6 +17,20 @@ QuadraTranslator::QuadraTranslator(QuadraArchitecture* arch)
 			_register_space_size = std::max(_register_space_size, varnode.offset + varnode.size);
 		}
 	}
+	
+	if(STORE_REGISTERS_IN_GLOBAL) {
+		auto registers_type = llvm::ArrayType::get(int_type(1), _register_space_size);
+		llvm::GlobalVariable* registers_global = new llvm::GlobalVariable(
+			_module,
+			registers_type,
+			false,
+			llvm::GlobalValue::CommonLinkage,
+			llvm::Constant::getNullValue(registers_type),
+			"registers");
+		_register_space = registers_global->getType()->getAddressSpace();
+		auto register_ptr_type = llvm::PointerType::get(int_type(1), _register_space);
+		_registers_global = _builder.CreatePointerCast(registers_global, register_ptr_type, "");
+	}
 }
 
 void QuadraTranslator::begin_function(QuadraFunction function)
@@ -27,11 +41,13 @@ void QuadraTranslator::begin_function(QuadraFunction function)
 	assert(blocks.size() >= 1);
 	_builder.SetInsertPoint(get_block(blocks[0])->llvm);
 	
-	auto registers_type = llvm::ArrayType::get(int_type(1), _register_space_size);
-	llvm::AllocaInst* registers_alloca = _builder.CreateAlloca(registers_type, nullptr, "registers");
-	_register_space = registers_alloca->getType()->getAddressSpace();
-	auto register_ptr_type = llvm::PointerType::get(int_type(1), _register_space);
-	_function.register_alloca = _builder.CreatePointerCast(registers_alloca, register_ptr_type, "");
+	if(!STORE_REGISTERS_IN_GLOBAL) {
+		auto registers_type = llvm::ArrayType::get(int_type(1), _register_space_size);
+		llvm::AllocaInst* registers_alloca = _builder.CreateAlloca(registers_type, nullptr, "registers");
+		_register_space = registers_alloca->getType()->getAddressSpace();
+		auto register_ptr_type = llvm::PointerType::get(int_type(1), _register_space);
+		_function.register_alloca = _builder.CreatePointerCast(registers_alloca, register_ptr_type, "");
+	}
 	
 	// HACK: Stack frame size fixed at 0x2000.
 	auto stack_type = llvm::ArrayType::get(int_type(1), 0x2000);
@@ -337,7 +353,7 @@ llvm::Value* QuadraTranslator::get_local(const Varnode* var)
 {
 	if(var->getSpace()->getName() == "register") {
 		auto offset = llvm::ConstantInt::get(_context, llvm::APInt(32, var->getOffset(), false));
-		llvm::Value* ptr8 = _builder.CreateGEP(_function.register_alloca, offset, "");
+		llvm::Value* ptr8 = _builder.CreateGEP(register_storage(), offset, "");
 		auto ptr_type = llvm::PointerType::get(int_type(var->getSize()), _register_space);
 		return _builder.CreatePointerCast(ptr8, ptr_type, "");
 	}
@@ -380,6 +396,15 @@ llvm::Value* QuadraTranslator::get_stack_memory(llvm::Value* offset, int4 size_b
 	llvm::Value* ptr = _builder.CreateGEP(_function.stack_alloca, offset, "");
 	auto ptr_type = llvm::PointerType::get(int_type(size_bytes), _function.stack_space);
 	return _builder.CreatePointerCast(ptr, ptr_type, "");
+}
+
+llvm::Value* QuadraTranslator::register_storage()
+{
+	if(STORE_REGISTERS_IN_GLOBAL) {
+		return _registers_global;
+	} else {
+		return _function.register_alloca;
+	}
 }
 
 llvm::Value* QuadraTranslator::zero(int4 bytes)

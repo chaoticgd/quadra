@@ -23,6 +23,8 @@ struct QuadraFunction {
 	llvm::Value* stack_alloca = nullptr;
 };
 
+static const bool STORE_REGISTERS_IN_GLOBAL = true;
+
 // Translates from pcode to LLVM IR.
 //
 // Basic blocks and pcode ops are fed to it using an immediate-style API, and
@@ -49,6 +51,9 @@ private:
 	llvm::Value* get_input(const Varnode* var); // Convert a Ghidra varnode to an LLVM value.
 	llvm::Value* get_local(const Varnode* var); // Create an alloca for a varnode if it doesn't already exist, then return it.
 	llvm::Value* get_stack_memory(llvm::Value* offset, int4 size_bytes); // Get a pointer to some stack memory given an offset.
+	
+	llvm::Value* register_storage();
+	
 	llvm::Value* zero(int4 bytes);
 	llvm::Type* int_type(int4 bytes);
 
@@ -64,6 +69,7 @@ private:
 	
 	uintb _register_space_size = 0;
 	unsigned int _register_space;
+	llvm::Value* _registers_global;
 };
 
 #endif
