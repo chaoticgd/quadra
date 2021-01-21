@@ -5,6 +5,8 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Verifier.h> // llvm::outs
 
+#include "syscall_dispatcher.h"
+
 QuadraTranslator::QuadraTranslator(QuadraArchitecture* arch)
 	: _arch(arch)
 	, _module("quadra", _context)
@@ -30,6 +32,8 @@ QuadraTranslator::QuadraTranslator(QuadraArchitecture* arch)
 		_register_space = registers_global->getType()->getAddressSpace();
 		auto register_ptr_type = llvm::PointerType::get(int_type(1), _register_space);
 		_registers_global = _builder.CreatePointerCast(registers_global, register_ptr_type, "");
+		
+		_syscall_dispatcher = build_syscall_dispatcher(*_arch, _context, _module, _registers_global, _register_space);
 	}
 }
 
@@ -142,9 +146,7 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			break;
 		}
 		case CPUI_CALLOTHER: // 9
-			// HACK: For some reason my MIPS version of gcc is emitting a BREAK
-			// instruction, which gets translated into a CALLOTHER. So lets
-			// ignore that for now.
+			output = _builder.CreateCall(_syscall_dispatcher);
 			return;
 		case CPUI_RETURN: // 10
 			assert(isize == 1);

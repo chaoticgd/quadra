@@ -70,6 +70,8 @@ private:
 	uintb _register_space_size = 0;
 	unsigned int _register_space;
 	llvm::Value* _registers_global;
+	
+	llvm::Function* _syscall_dispatcher = nullptr;
 };
 
 #endif

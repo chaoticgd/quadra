@@ -10,6 +10,7 @@ add_executable(quadra
 	src/elf_loader.cpp
 	src/translator.cpp
 	src/quadra_architecture.cpp
+	src/syscall_dispatcher.cpp
 )
 
 set(DECOMPILER_SOURCE_DIR "${GHIDRA_DIR}/Ghidra/Features/Decompiler/src")
@@ -53,3 +54,7 @@ add_dependencies(quadra sleigh_library sleigh_compiler)
 if(UNIX)
 	target_link_libraries(quadra stdc++fs)
 endif()
+
+add_library(mips_o32_linux STATIC
+	syscalls/mips_o32_linux.c
+)
