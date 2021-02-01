@@ -13,8 +13,8 @@
 
 namespace fs = std::filesystem;
 
-void disassemble_pcodeop(size_t index, const PcodeOp& op);
-void print_vardata(const Varnode& var);
+void disassemble_pcodeop(const Translate& translate, size_t index, const PcodeOp& op);
+void print_vardata(const Translate& translate, const Varnode& var);
 
 int main(int argc, char** argv)
 {
@@ -79,7 +79,7 @@ int main(int argc, char** argv)
 				}
 				last_address = op.getAddr();
 				
-				disassemble_pcodeop(op.getTime() - first_time, op);
+				disassemble_pcodeop(*arch.translate, op.getTime() - first_time, op);
 				pcode_to_llvm.translate_pcodeop(op);
 			}
 			pcode_to_llvm.end_block();
@@ -95,23 +95,30 @@ int main(int argc, char** argv)
 	shutdownDecompilerLibrary(); // Does nothing.
 }
 
-void disassemble_pcodeop(size_t index, const PcodeOp& op)
+void disassemble_pcodeop(const Translate& translate, size_t index, const PcodeOp& op)
 {
 	fprintf(stderr, "\t %08lx:%04lx\t", op.getAddr().getOffset(), index);
 	if(op.getOut() != nullptr) {
-		print_vardata(*op.getOut());
+		print_vardata(translate, *op.getOut());
 		std::cerr << " = ";
 	}
 	std::cerr << get_opname(op.code());
 	for(int4 i = 0; i < op.numInput(); i++) {
 		std::cerr << ' ';
-		print_vardata(*op.getIn(i));
+		print_vardata(translate, *op.getIn(i));
 	}
 	std::cerr << endl;
 }
 
-void print_vardata(const Varnode& var)
+void print_vardata(const Translate& translate, const Varnode& var)
 {
+	if(var.getSpace()->getName() == "register") {
+		auto name = translate.getRegisterName(var.getSpace(), var.getOffset(), var.getSize());
+		if(name.size() > 0) {
+			std::cerr << name << ':' << var.getSize();
+			return;
+		}
+	}
 	std::cerr << '(' << var.getSpace()->getName() << ',';
 	var.getSpace()->printOffset(std::cerr, var.getOffset());
 	std::cerr << ',' << dec << var.getSize() << ')';
