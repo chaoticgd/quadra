@@ -313,7 +313,11 @@ QuadraFunction* QuadraTranslator::get_function(Address address, const char* name
 	}
 	
 	QuadraFunction& function = discovered_functions[address];
-	function.ghidra = std::make_unique<Funcdata>(name_ss.str(), _arch->symboltab->getGlobalScope(), address, 0);
+	// The Funcdata object is owned by the FunctionSymbol object, which is in
+	// turn owned by a Scope object, which is owned by a Database object, which
+	// is owned by the Architecture object.
+	FunctionSymbol* symbol = _arch->symboltab->getGlobalScope()->addFunction(address, name_ss.str());
+	function.ghidra = symbol->getFunction();
 	
 	// Generate pcode ops, basic blocks and call specs.
 	function.ghidra->startProcessing();

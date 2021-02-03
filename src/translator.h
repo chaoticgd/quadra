@@ -15,7 +15,7 @@ struct QuadraBlock {
 };
 
 struct QuadraFunction {
-	std::unique_ptr<Funcdata> ghidra;
+	Funcdata* ghidra;
 	llvm::Function* llvm = nullptr;
 	std::map<const Varnode*, llvm::AllocaInst*> locals;
 	llvm::Value* register_alloca = nullptr;

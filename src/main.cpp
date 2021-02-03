@@ -54,12 +54,12 @@ int main(int argc, char** argv)
 		auto node_handle = pcode_to_llvm.discovered_functions.extract(address);
 		QuadraFunction function = std::move(node_handle.mapped());
 		
-		const auto blocks = function.ghidra->getBasicBlocks();
+		const BlockGraph* blocks = &function.ghidra->getBasicBlocks();
 		pcode_to_llvm.begin_function(std::move(function));
 		
 		fprintf(stderr, "%s() {\n", function.llvm->getName().data());
 		
-		for(const FlowBlock* block : blocks.getList()) {
+		for(const FlowBlock* block : blocks->getList()) {
 			const BlockBasic* basic = dynamic_cast<const BlockBasic*>(block);
 			assert(basic != nullptr); // We're not doing any control flow recovery, this should never happen.
 			
