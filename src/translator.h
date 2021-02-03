@@ -50,12 +50,17 @@ private:
 	QuadraBlock* get_block(const FlowBlock* gblock);
 	llvm::Value* get_input(const Varnode* var); // Convert a Ghidra varnode to an LLVM value.
 	llvm::Value* get_local(const Varnode* var); // Create an alloca for a varnode if it doesn't already exist, then return it.
-	llvm::Value* get_stack_memory(llvm::Value* offset, int4 size_bytes); // Get a pointer to some stack memory given an offset.
+	llvm::Value* get_register(uintb offset, int4 size_bytes); // Get a pointer to a register.
+	llvm::Value* decompress_pointer(llvm::Value* val, llvm::Value* hi, llvm::Type* ptr_type); // Take a truncated pointer, add on the hi 32 bits pf hi.
 	
 	llvm::Value* register_storage();
 	
 	llvm::Value* zero(int4 bytes);
 	llvm::Type* int_type(int4 bytes);
+	
+	void create_printf_int(const char* fmt, llvm::Value* val);
+	
+	llvm::Function* create_syscall_dispatcher();
 
 	QuadraArchitecture* _arch;
 	

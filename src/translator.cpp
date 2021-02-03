@@ -5,8 +5,6 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Verifier.h> // llvm::outs
 
-#include "syscall_dispatcher.h"
-
 QuadraTranslator::QuadraTranslator(QuadraArchitecture* arch)
 	: _arch(arch)
 	, _module("quadra", _context)
@@ -33,7 +31,7 @@ QuadraTranslator::QuadraTranslator(QuadraArchitecture* arch)
 		auto register_ptr_type = llvm::PointerType::get(int_type(1), _register_space);
 		_registers_global = _builder.CreatePointerCast(registers_global, register_ptr_type, "");
 		
-		_syscall_dispatcher = build_syscall_dispatcher(*_arch, _context, _module, _registers_global, _register_space);
+		_syscall_dispatcher = create_syscall_dispatcher();
 	}
 }
 
@@ -107,14 +105,17 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			assert(op.getOut()->getSize() == op.getIn(0)->getSize());
 			output = inputs[0];
 			break;
-		case CPUI_LOAD: // 2
+		case CPUI_LOAD: { // 2
 			assert(isize == 2);
-			tmp1 = get_stack_memory(inputs[1], op.getOut()->getSize());
+			type = llvm::PointerType::get(int_type(op.getOut()->getSize()), _function.stack_space);
+			tmp1 = decompress_pointer(inputs[1], _function.stack_alloca, type);
 			output = _builder.CreateLoad(tmp1, "");
 			break;
+		}
 		case CPUI_STORE: // 3
 			assert(isize == 3);
-			tmp1 = get_stack_memory(inputs[1], op.getIn(2)->getSize());
+			type = llvm::PointerType::get(int_type(op.getIn(2)->getSize()), _function.stack_space);
+			tmp1 = decompress_pointer(inputs[1], _function.stack_alloca, type);
 			output = _builder.CreateStore(inputs[2], tmp1, false);
 			break;
 		case CPUI_BRANCH: // 4
@@ -223,7 +224,8 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			break;
 		case CPUI_INT_LEFT: // 29
 			assert(isize == 2);
-			output = _builder.CreateShl(inputs[0], inputs[1], "", false, false);
+			tmp1 = _builder.CreateZExt(inputs[1], int_type(op.getIn(0)->getSize()), "");
+			output = _builder.CreateShl(inputs[0], tmp1, "", false, false);
 			break;
 		case CPUI_INT_RIGHT: // 30
 			assert(isize == 2);
@@ -343,9 +345,9 @@ llvm::Value* QuadraTranslator::get_input(const Varnode* var)
 		return llvm::ConstantInt::get(type, llvm::APInt(var->getSize() * 8, var->getOffset(), false));
 	}
 	
-	// HACK: Assume the MIPS stack pointer is zero.
-	if(var->getSpace()->getName() == "register" && var->getOffset() == 0xe8) {
-		return zero(var->getSize());
+	// Point the MIPS stack pointer at the stack allocation.
+	if(var->getSpace()->getName() == "register" && var->getOffset() == 0x1d0) {
+		return _builder.CreatePtrToInt(_function.stack_alloca, int_type(var->getSize()));
 	}
 	
 	return _builder.CreateLoad(get_local(var), "");
@@ -354,10 +356,7 @@ llvm::Value* QuadraTranslator::get_input(const Varnode* var)
 llvm::Value* QuadraTranslator::get_local(const Varnode* var)
 {
 	if(var->getSpace()->getName() == "register") {
-		auto offset = llvm::ConstantInt::get(_context, llvm::APInt(32, var->getOffset(), false));
-		llvm::Value* ptr8 = _builder.CreateGEP(register_storage(), offset, "");
-		auto ptr_type = llvm::PointerType::get(int_type(var->getSize()), _register_space);
-		return _builder.CreatePointerCast(ptr8, ptr_type, "");
+		return get_register(var->getOffset(), var->getSize());
 	}
 	
 	auto compare_varnodes = [](const Varnode* l, const Varnode* r) {
@@ -393,11 +392,23 @@ llvm::Value* QuadraTranslator::get_local(const Varnode* var)
 	return local;
 }
 
-llvm::Value* QuadraTranslator::get_stack_memory(llvm::Value* offset, int4 size_bytes)
+llvm::Value* QuadraTranslator::get_register(uintb offset, int4 size_bytes)
 {
-	llvm::Value* ptr = _builder.CreateGEP(_function.stack_alloca, offset, "");
-	auto ptr_type = llvm::PointerType::get(int_type(size_bytes), _function.stack_space);
-	return _builder.CreatePointerCast(ptr, ptr_type, "");
+	auto offset_const = llvm::ConstantInt::get(_context, llvm::APInt(32, offset, false));
+	llvm::Value* ptr8 = _builder.CreateGEP(register_storage(), offset_const, "");
+	auto ptr_type = llvm::PointerType::get(int_type(size_bytes), _register_space);
+	return _builder.CreatePointerCast(ptr8, ptr_type, "");
+}
+
+llvm::Value* QuadraTranslator::decompress_pointer(llvm::Value* val, llvm::Value* hi, llvm::Type* ptr_type)
+{
+	auto lo_mask = llvm::ConstantInt::get(_context, llvm::APInt(64, 0x00000000ffffffff, false));
+	auto hi_mask = llvm::ConstantInt::get(_context, llvm::APInt(64, 0xffffffff00000000, false));
+	auto stack_ptr = _builder.CreatePtrToInt(hi, int_type(8));
+	auto stack_ptr_hi = _builder.CreateAnd(stack_ptr, hi_mask);
+	auto lo_ptr = _builder.CreateZExt(val, int_type(8));
+	auto combined_ptr = _builder.CreateOr(stack_ptr_hi, lo_ptr);
+	return _builder.CreateIntToPtr(combined_ptr, ptr_type);
 }
 
 llvm::Value* QuadraTranslator::register_storage()
@@ -417,4 +428,108 @@ llvm::Value* QuadraTranslator::zero(int4 bytes)
 llvm::Type* QuadraTranslator::int_type(int4 bytes)
 {
 	return llvm::IntegerType::get(_context, bytes * 8);
+}
+
+void QuadraTranslator::create_printf_int(const char* fmt, llvm::Value* val)
+{
+	// https://stackoverflow.com/questions/30234027/how-to-call-printf-in-llvm-through-the-module-builder-system
+	llvm::Function* printf = _module.getFunction("printf");
+	if(printf == nullptr) {
+		llvm::PointerType *Pty = llvm::PointerType::get(llvm::IntegerType::get(_module.getContext(), 8), 0);
+		llvm::FunctionType *FuncTy9 = llvm::FunctionType::get(llvm::IntegerType::get(_module.getContext(), 32), true);
+
+		printf = llvm::Function::Create(FuncTy9, llvm::GlobalValue::ExternalLinkage, "printf", &_module);
+		printf->setCallingConv(llvm::CallingConv::C);
+
+		llvm::AttributeList printf_attr_list;
+		printf->setAttributes(printf_attr_list);
+	}
+	
+	llvm::Value* args[2] = { _builder.CreateGlobalStringPtr(fmt), val };
+	llvm::ArrayRef<llvm::Value*> args_ref(args, args + 2);
+	_builder.CreateCall(_module.getFunction("printf"), args_ref);
+}
+
+llvm::Function* QuadraTranslator::create_syscall_dispatcher()
+{
+	//DocumentStorage doc_store;
+	//Document* languages_xml = doc_store.openDocument("syscalls/languages.xml");
+	
+	llvm::FunctionType* func_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(_context), false);
+	llvm::Function* dispatcher = llvm::Function::Create(
+		func_type,
+		llvm::Function::ExternalLinkage,
+		"__quadra_dispatch_syscall",
+		_module);
+	
+	llvm::BasicBlock* entry = llvm::BasicBlock::Create(_context, "entry", dispatcher);
+	_builder.SetInsertPoint(entry);
+	
+	std::vector<std::string> arg_reg_names = { "a0", "a1", "a2", "a3" };
+	std::vector<llvm::Value*> arg_regs;
+	for(auto& name : arg_reg_names) {
+		VarnodeData reg = _arch->translate->getRegister(name);
+		arg_regs.push_back(get_register(reg.offset, reg.size));
+	}
+	
+	struct SyscallInfo {
+		std::string symbol;
+		llvm::Type* return_type;
+		std::vector<llvm::Type*> argument_types;
+	};
+	
+	llvm::Type* char_type = llvm::Type::getInt8Ty(_context);
+	llvm::Type* u32_type = llvm::Type::getInt32Ty(_context);
+	llvm::Type* char_ptr_type = llvm::PointerType::get(char_type, _register_space);
+	std::map<int, SyscallInfo> syscalls {
+		{4001, {"qsys_exit", u32_type, {u32_type}}},
+		{4003, {"qsys_read", u32_type, {u32_type, char_ptr_type, u32_type}}},
+		{4004, {"qsys_write", u32_type, {u32_type, char_ptr_type, u32_type}}},
+		{4005, {"qsys_open", u32_type, {char_ptr_type, u32_type, u32_type}}},
+		{4006, {"qsys_close", u32_type, {u32_type}}}
+	};
+	
+	// Used to get the stack pointer.
+	llvm::AllocaInst* dummy_alloca = _builder.CreateAlloca(int_type(1), nullptr, "stackframe");
+	
+	VarnodeData syscall_number_reg = _arch->translate->getRegister("v0");
+	
+	llvm::Value* v0_ptr = get_register(syscall_number_reg.offset, 4);
+	auto syscall_number = _builder.CreateLoad(v0_ptr);
+	
+	for(auto& [number, syscall] : syscalls) {
+		llvm::Value* number_val = llvm::ConstantInt::get(_context, llvm::APInt(32, number, false));
+		auto cond = _builder.CreateICmpEQ(syscall_number, number_val, "cmp");
+		
+		llvm::BasicBlock* truthy = llvm::BasicBlock::Create(_context, "sys_" + std::to_string(number), dispatcher);
+		llvm::BasicBlock* continuation = llvm::BasicBlock::Create(_context, "", dispatcher);
+		_builder.CreateCondBr(cond, truthy, continuation);
+		
+		llvm::FunctionType* wrapper_type = llvm::FunctionType::get(syscall.return_type, syscall.argument_types, false);
+		llvm::Function* wrapper = llvm::Function::Create(
+			wrapper_type,
+			llvm::GlobalValue::ExternalLinkage,
+			syscall.symbol,
+			_module);
+		
+		_builder.SetInsertPoint(truthy);
+		std::vector<llvm::Value*> args;
+		for(int i = 0; i < syscall.argument_types.size(); i++) {
+			llvm::Value* arg = _builder.CreateLoad(arg_regs[i]);
+			if(syscall.argument_types[i]->isPointerTy()) {
+				arg = decompress_pointer(arg, dummy_alloca, syscall.argument_types[i]);
+			} else {
+				arg = _builder.CreateZExtOrTrunc(arg, syscall.argument_types[i]);
+			}
+			args.push_back(arg);
+		}
+		auto result = _builder.CreateCall(wrapper, args);
+		_builder.CreateStore(result, v0_ptr, false);
+		_builder.CreateBr(continuation);
+		_builder.SetInsertPoint(continuation);
+	}
+	
+	_builder.CreateRet(llvm::ConstantInt::get(_context, llvm::APInt(32, 0, false)));
+	
+	return dispatcher;
 }

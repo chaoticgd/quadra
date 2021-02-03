@@ -10,7 +10,6 @@ add_executable(quadra
 	src/elf_loader.cpp
 	src/translator.cpp
 	src/quadra_architecture.cpp
-	src/syscall_dispatcher.cpp
 )
 
 set(DECOMPILER_SOURCE_DIR "${GHIDRA_DIR}/Ghidra/Features/Decompiler/src")

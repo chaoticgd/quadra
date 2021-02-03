@@ -1,4 +1,4 @@
-all: add mul loop function intargs syscall
+all: add mul loop function intargs syscall hello
 add: add.S
 	ee-gcc add.S -o add -nostdlib
 mul: mul.S
@@ -11,3 +11,5 @@ intargs: ../intargs.c
 	ee-gcc ../intargs.c -o intargs -nostdlib
 syscall: syscall.c
 	ee-gcc syscall.c -o syscall -nostdlib -O3
+hello: hello.c
+	ee-gcc hello.c -o hello -nostdlib -O3

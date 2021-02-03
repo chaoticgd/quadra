@@ -115,7 +115,7 @@ void print_vardata(const Translate& translate, const Varnode& var)
 	if(var.getSpace()->getName() == "register") {
 		auto name = translate.getRegisterName(var.getSpace(), var.getOffset(), var.getSize());
 		if(name.size() > 0) {
-			std::cerr << name << ':' << var.getSize();
+			std::cerr << name << ':' << var.getOffset() << ':' << var.getSize();
 			return;
 		}
 	}
