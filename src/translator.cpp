@@ -283,13 +283,14 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 		case CPUI_BOOL_AND: // 39
 		case CPUI_BOOL_OR: // 40
 			break;
-		case CPUI_SUBPIECE: {// 63
+		case CPUI_SUBPIECE: { // 63
 			assert(isize == 2);
 			assert(op.getIn(1)->getAddr().isConstant());
 			llvm::APInt shift_val(op.getIn(0)->getSize() * 8, op.getIn(0)->getOffset() * 8, false);
 			llvm::Value* shift = llvm::ConstantInt::get(_context, shift_val);
 			llvm::Value* shifted = _builder.CreateAShr(inputs[0], shift, "", false);
 			output = _builder.CreateTrunc(shifted, int_type(op.getOut()->getSize()), "");
+			break;
 		}
 		case CPUI_POPCOUNT: // 72
 			assert(isize == 1);
