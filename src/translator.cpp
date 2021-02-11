@@ -5,6 +5,8 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Verifier.h> // llvm::outs
 
+#include "elf_loader.h"
+
 QuadraTranslator::QuadraTranslator(QuadraArchitecture* arch)
 	: _arch(arch)
 	, _module("quadra", _context)
@@ -339,6 +341,9 @@ QuadraFunction* QuadraTranslator::get_function(Address address, const char* name
 	assert(!function.ghidra->hasBadData() && "Function flowed into bad data!!!");
 	
 	llvm::FunctionType* func_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(_context), false);
+	if(((ElfLoader*) _arch->loader)->machine() == ElfMachine::AMD64) {
+		func_type = llvm::FunctionType::get(llvm::Type::getInt64Ty(_context), false);
+	}
 	function.llvm = llvm::Function::Create(func_type, llvm::Function::ExternalLinkage, name_ss.str(), _module);
 	return &function;
 }
