@@ -140,24 +140,27 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			Address callee_addr = call->getEntryAddress();
 			QuadraFunction* callee = get_function(callee_addr, nullptr);
 			llvm::Value* return_value = _builder.CreateCall(callee->llvm, {}, "", nullptr);
+			VarnodeData return_reg = _arch->translate->getRegister(_arch->return_register());
+			Address return_addr = Address(_arch->getSpaceByName("register"), return_reg.offset);
 			llvm::Value* v0 = get_local(_function.ghidra->newVarnode(
-				_arch->getSpaceByName("register")->getIndex(),
-				Address(_arch->getSpaceByName("register"), _arch->translate->getRegister("v0").offset)));
+				return_reg.size, return_addr));
 			output = _builder.CreateStore(return_value, v0);
 			break;
 		}
 		case CPUI_CALLOTHER: // 9
 			output = _builder.CreateCall(_syscall_dispatcher);
 			return;
-		case CPUI_RETURN: // 10
+		case CPUI_RETURN: { // 10
 			assert(isize == 1);
 			// HACK!
+			VarnodeData return_reg = _arch->translate->getRegister(_arch->return_register());
+			Address return_addr = Address(_arch->getSpaceByName("register"), return_reg.offset);
 			tmp1 = get_input(_function.ghidra->newVarnode(
-				_arch->getSpaceByName("register")->getIndex(),
-				Address(_arch->getSpaceByName("register"), _arch->translate->getRegister("v0").offset)));
+				return_reg.size, return_addr));
 			output = _builder.CreateRet(tmp1);
 			block.emitted_branch = true;
 			break;
+		}
 		case CPUI_INT_EQUAL: // 11
 			tmp1 = _builder.CreateICmpEQ(inputs[0], inputs[1], "");
 			output = _builder.CreateZExt(tmp1, int_type(1), ""); // i1 -> i8
@@ -200,7 +203,15 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			output = _builder.CreateSub(inputs[0], inputs[1], "", false, false);
 			break;
 		case CPUI_INT_CARRY: // 21
+			assert(isize == 2);
+			// Obviously wrong!
+			output = _builder.CreateTrunc(inputs[0], int_type(op.getOut()->getSize()));
+			break;
 		case CPUI_INT_SCARRY: // 22
+			assert(isize == 2);
+			// Obviously wrong!
+			output = _builder.CreateTrunc(inputs[0], int_type(op.getOut()->getSize()));
+			break;
 		case CPUI_INT_SBORROW: // 23
 			break;
 		case CPUI_INT_2COMP: // 24
@@ -273,8 +284,12 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			llvm::Value* shift = llvm::ConstantInt::get(_context, shift_val);
 			llvm::Value* shifted = _builder.CreateAShr(inputs[0], shift, "", false);
 			output = _builder.CreateTrunc(shifted, int_type(op.getOut()->getSize()), "");
-			break;
 		}
+		case CPUI_POPCOUNT: // 72
+			assert(isize == 1);
+			// Obviously wrong!
+			output = _builder.CreateTrunc(inputs[0], int_type(op.getOut()->getSize()));
+			break;
 	}
 	
 	assert(output != nullptr && "Unimplemented or bad pcodeop!!!");

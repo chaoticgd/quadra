@@ -10,6 +10,7 @@ public:
 		const std::string& targ,
 		std::ostream* estream);
 	
+	std::string return_register();
 	std::vector<std::string> syscall_argument_registers();
 	std::string syscall_return_register();
 

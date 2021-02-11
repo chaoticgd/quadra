@@ -11,6 +11,15 @@ QuadraArchitecture::QuadraArchitecture(
 	: SleighArchitecture(fname, targ, estream)
 {}
 
+std::string QuadraArchitecture::return_register()
+{
+	switch(((ElfLoader*) loader)->machine()) {
+		case ElfMachine::MIPS: return { "v0" };
+		case ElfMachine::AMD64: return { "RAX" };
+	}
+	return {};
+}
+
 std::vector<std::string> QuadraArchitecture::syscall_argument_registers()
 {
 	switch(((ElfLoader*) loader)->machine()) {
