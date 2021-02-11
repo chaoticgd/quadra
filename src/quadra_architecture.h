@@ -3,6 +3,16 @@
 
 #include <decompile/cpp/sleigh_arch.hh>
 
+enum PrimtiveType {
+	PT_U32, PT_CHAR_PTR
+};
+
+struct SyscallInfo {
+	std::string symbol;
+	PrimtiveType return_type;
+	std::vector<PrimtiveType> argument_types;
+};
+
 class QuadraArchitecture : public SleighArchitecture {
 public:
 	QuadraArchitecture(
@@ -13,6 +23,8 @@ public:
 	std::string return_register();
 	std::vector<std::string> syscall_argument_registers();
 	std::string syscall_return_register();
+
+	std::map<int, SyscallInfo> syscalls();
 
 private:
 	void buildLoader(DocumentStorage& store) override;

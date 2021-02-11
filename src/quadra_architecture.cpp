@@ -17,7 +17,7 @@ std::string QuadraArchitecture::return_register()
 		case ElfMachine::MIPS: return { "v0" };
 		case ElfMachine::AMD64: return { "RAX" };
 	}
-	return {};
+	assert(0);
 }
 
 std::vector<std::string> QuadraArchitecture::syscall_argument_registers()
@@ -26,7 +26,7 @@ std::vector<std::string> QuadraArchitecture::syscall_argument_registers()
 		case ElfMachine::MIPS: return { "a0", "a1", "a2", "a3" };
 		case ElfMachine::AMD64: return { "RDI", "RSI", "RDX", "R10", "R8", "R9" };
 	}
-	return {};
+	assert(0);
 }
 
 std::string QuadraArchitecture::syscall_return_register()
@@ -35,7 +35,22 @@ std::string QuadraArchitecture::syscall_return_register()
 		case ElfMachine::MIPS: return { "v0" };
 		case ElfMachine::AMD64: return { "RAX" };
 	}
-	return {};
+	assert(0);
+}
+
+std::map<int, SyscallInfo> QuadraArchitecture::syscalls()
+{
+	switch(((ElfLoader*) loader)->machine()) {
+		case ElfMachine::MIPS: return {
+			{4001, {"qsys_exit", PT_U32, {PT_U32}}},
+			{4003, {"qsys_read", PT_U32, {PT_U32, PT_CHAR_PTR, PT_U32}}},
+			{4004, {"qsys_write", PT_U32, {PT_U32, PT_CHAR_PTR, PT_U32}}},
+			{4005, {"qsys_open", PT_U32, {PT_CHAR_PTR, PT_U32, PT_U32}}},
+			{4006, {"qsys_close", PT_U32, {PT_U32}}}
+		};
+		case ElfMachine::AMD64: return {};
+	}
+	assert(0);
 }
 
 void QuadraArchitecture::buildLoader(DocumentStorage& store)

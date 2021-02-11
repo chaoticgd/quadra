@@ -1,11 +1,9 @@
 section .text
 global _start
 _start:
-	xor rdi, rdi
-	add rdi, 1
-	add rdi, 2
-	add rdi, 3
-	add rdi, 4
-	mov rax, 60 ; exit
-	syscall
+	xor rax, rax
+	add rax, 1
+	add rax, 2
+	add rax, 3
+	add rax, 4
 	ret

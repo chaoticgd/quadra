@@ -109,6 +109,10 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			break;
 		case CPUI_LOAD: { // 2
 			assert(isize == 2);
+			if(((ElfLoader*) _arch->loader)->machine() == ElfMachine::AMD64) {
+				output = inputs[0];
+				break;
+			}
 			type = llvm::PointerType::get(int_type(op.getOut()->getSize()), _function.stack_space);
 			tmp1 = decompress_pointer(inputs[1], _function.stack_alloca, type);
 			output = _builder.CreateLoad(tmp1, "");
@@ -426,6 +430,9 @@ llvm::Value* QuadraTranslator::get_register(uintb offset, int4 size_bytes)
 
 llvm::Value* QuadraTranslator::decompress_pointer(llvm::Value* val, llvm::Value* hi, llvm::Type* ptr_type)
 {
+	if(((ElfLoader*) _arch->loader)->machine() == ElfMachine::AMD64) {
+		return _builder.CreateIntToPtr(val, ptr_type); // No need to convert between 32 bit/64 bit pointers for amd64.
+	}
 	auto lo_mask = llvm::ConstantInt::get(_context, llvm::APInt(64, 0x00000000ffffffff, false));
 	auto hi_mask = llvm::ConstantInt::get(_context, llvm::APInt(64, 0xffffffff00000000, false));
 	auto stack_ptr = _builder.CreatePtrToInt(hi, int_type(8));
@@ -495,22 +502,16 @@ llvm::Function* QuadraTranslator::create_syscall_dispatcher()
 		VarnodeData reg = _arch->translate->getRegister(name);
 		arg_regs.push_back(get_register(reg.offset, reg.size));
 	}
-	
-	struct SyscallInfo {
-		std::string symbol;
-		llvm::Type* return_type;
-		std::vector<llvm::Type*> argument_types;
-	};
-	
 	llvm::Type* char_type = llvm::Type::getInt8Ty(_context);
 	llvm::Type* u32_type = llvm::Type::getInt32Ty(_context);
 	llvm::Type* char_ptr_type = llvm::PointerType::get(char_type, _register_space);
-	std::map<int, SyscallInfo> syscalls {
-		{4001, {"qsys_exit", u32_type, {u32_type}}},
-		{4003, {"qsys_read", u32_type, {u32_type, char_ptr_type, u32_type}}},
-		{4004, {"qsys_write", u32_type, {u32_type, char_ptr_type, u32_type}}},
-		{4005, {"qsys_open", u32_type, {char_ptr_type, u32_type, u32_type}}},
-		{4006, {"qsys_close", u32_type, {u32_type}}}
+	
+	auto to_llvm_type = [&](PrimtiveType type) {
+		switch(type) {
+			case PT_U32: return u32_type;
+			case PT_CHAR_PTR: return char_ptr_type;
+		}
+		assert(0);
 	};
 	
 	// Used to get the stack pointer.
@@ -521,7 +522,7 @@ llvm::Function* QuadraTranslator::create_syscall_dispatcher()
 	llvm::Value* v0_ptr = get_register(syscall_number_reg.offset, 4);
 	auto syscall_number = _builder.CreateLoad(v0_ptr);
 	
-	for(auto& [number, syscall] : syscalls) {
+	for(auto& [number, syscall] : _arch->syscalls()) {
 		llvm::Value* number_val = llvm::ConstantInt::get(_context, llvm::APInt(32, number, false));
 		auto cond = _builder.CreateICmpEQ(syscall_number, number_val, "cmp");
 		
@@ -529,7 +530,11 @@ llvm::Function* QuadraTranslator::create_syscall_dispatcher()
 		llvm::BasicBlock* continuation = llvm::BasicBlock::Create(_context, "", dispatcher);
 		_builder.CreateCondBr(cond, truthy, continuation);
 		
-		llvm::FunctionType* wrapper_type = llvm::FunctionType::get(syscall.return_type, syscall.argument_types, false);
+		std::vector<llvm::Type*> arg_types;
+		for(PrimtiveType type : syscall.argument_types) {
+			arg_types.push_back(to_llvm_type(type));
+		}
+		llvm::FunctionType* wrapper_type = llvm::FunctionType::get(to_llvm_type(syscall.return_type), arg_types, false);
 		llvm::Function* wrapper = llvm::Function::Create(
 			wrapper_type,
 			llvm::GlobalValue::ExternalLinkage,
@@ -540,10 +545,11 @@ llvm::Function* QuadraTranslator::create_syscall_dispatcher()
 		std::vector<llvm::Value*> args;
 		for(int i = 0; i < syscall.argument_types.size(); i++) {
 			llvm::Value* arg = _builder.CreateLoad(arg_regs[i]);
-			if(syscall.argument_types[i]->isPointerTy()) {
-				arg = decompress_pointer(arg, dummy_alloca, syscall.argument_types[i]);
+			llvm::Type* arg_type =  to_llvm_type(syscall.argument_types[i]);
+			if(arg_type->isPointerTy()) {
+				arg = decompress_pointer(arg, dummy_alloca, arg_type);
 			} else {
-				arg = _builder.CreateZExtOrTrunc(arg, syscall.argument_types[i]);
+				arg = _builder.CreateZExtOrTrunc(arg, to_llvm_type(syscall.argument_types[i]));
 			}
 			args.push_back(arg);
 		}
