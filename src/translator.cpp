@@ -163,7 +163,7 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			Address return_addr = Address(_arch->getSpaceByName("register"), return_reg.offset);
 			tmp1 = get_input(_function.ghidra->newVarnode(
 				return_reg.size, return_addr));
-			output = _builder.CreateRet(tmp1);
+			output = _builder.CreateRet(_builder.CreateZExt(tmp1, int_type(8)));
 			block.emitted_branch = true;
 			break;
 		}
@@ -344,10 +344,7 @@ QuadraFunction* QuadraTranslator::get_function(Address address, const char* name
 	function.ghidra->startProcessing();
 	assert(!function.ghidra->hasBadData() && "Function flowed into bad data!!!");
 	
-	llvm::FunctionType* func_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(_context), false);
-	if(((ElfLoader*) _arch->loader)->machine() == ElfMachine::AMD64) {
-		func_type = llvm::FunctionType::get(llvm::Type::getInt64Ty(_context), false);
-	}
+	llvm::FunctionType* func_type = llvm::FunctionType::get(llvm::Type::getInt64Ty(_context), false);
 	function.llvm = llvm::Function::Create(func_type, llvm::Function::ExternalLinkage, name_ss.str(), _module);
 	return &function;
 }
