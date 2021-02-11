@@ -469,7 +469,7 @@ llvm::Function* QuadraTranslator::create_syscall_dispatcher()
 	llvm::BasicBlock* entry = llvm::BasicBlock::Create(_context, "entry", dispatcher);
 	_builder.SetInsertPoint(entry);
 	
-	std::vector<std::string> arg_reg_names = { "a0", "a1", "a2", "a3" };
+	std::vector<std::string> arg_reg_names = _arch->syscall_argument_registers();
 	std::vector<llvm::Value*> arg_regs;
 	for(auto& name : arg_reg_names) {
 		VarnodeData reg = _arch->translate->getRegister(name);
@@ -496,7 +496,7 @@ llvm::Function* QuadraTranslator::create_syscall_dispatcher()
 	// Used to get the stack pointer.
 	llvm::AllocaInst* dummy_alloca = _builder.CreateAlloca(int_type(1), nullptr, "stackframe");
 	
-	VarnodeData syscall_number_reg = _arch->translate->getRegister("v0");
+	VarnodeData syscall_number_reg = _arch->translate->getRegister(_arch->syscall_return_register());
 	
 	llvm::Value* v0_ptr = get_register(syscall_number_reg.offset, 4);
 	auto syscall_number = _builder.CreateLoad(v0_ptr);

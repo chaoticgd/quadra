@@ -26,6 +26,11 @@ enum class ElfFileType : uint16_t {
 	HIPROC = 0xffff
 };
 
+enum class ElfMachine : uint16_t {
+	MIPS  = 0x08,
+	AMD64 = 0x3e
+};
+
 packed_struct(ElfIdentHeader,
 	uint8_t magic[4];      // 0x0 7f 45 4c 46
 	ElfIdentClass e_class; // 0x4
@@ -38,7 +43,7 @@ packed_struct(ElfIdentHeader,
 
 packed_struct(ElfFileHeader32,
 	ElfFileType type;     // 0x10
-	uint16_t machine;     // 0x12
+	ElfMachine machine;   // 0x12
 	uint32_t version;     // 0x14
 	uint32_t entry;       // 0x18
 	uint32_t phoff;       // 0x1c
@@ -54,7 +59,7 @@ packed_struct(ElfFileHeader32,
 
 packed_struct(ElfFileHeader64,
 	ElfFileType type;     // 0x10
-	uint16_t machine;     // 0x12
+	ElfMachine machine;   // 0x12
 	uint32_t version;     // 0x14
 	uint64_t entry;       // 0x18
 	uint64_t phoff;       // 0x20
@@ -87,7 +92,7 @@ packed_struct(ElfProgramHeader64,
 	uint64_t paddr;  // 0x18
 	uint64_t filesz; // 0x20
 	uint64_t memsz;  // 0x28
-	uint32_t align;  // 0x30
+	uint64_t align;  // 0x30
 )
 
 class ElfLoader : public LoadImage {
@@ -98,7 +103,8 @@ public:
 	string getArchType() const override;
 	void adjustVma(long adjust) override;
 	
-	uint64_t entry_point() { return _header.entry; }
+	uint64_t entry_point() const { return _header.entry; }
+	ElfMachine machine() const { return _header.machine; }
 	uint64_t file_offset_from_virtual_address(uint64_t virtual_address);
 	uint64_t top_of_segment_containing(uint64_t virtual_address);
 

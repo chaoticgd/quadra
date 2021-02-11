@@ -60,7 +60,13 @@ ElfLoader::ElfLoader(std::string elf_path)
 
 std::string ElfLoader::getArchType() const
 {
-	return "r5900:LE:32:default"; // HACK!
+	switch(machine()) {
+		case ElfMachine::MIPS: return "r5900:LE:32:default";
+		case ElfMachine::AMD64: return "x86:LE:64:default";
+		default:
+			fprintf(stderr, "error: ELF targets an unknown architecture.\n");
+			exit(1);
+	}
 }
 
 void ElfLoader::adjustVma(long adjust)

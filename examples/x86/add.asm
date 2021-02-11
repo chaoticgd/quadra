@@ -1,10 +1,11 @@
 section .text
 global _start
 _start:
-	xor ebx, ebx
-	add ebx, 1
-	add ebx, 2
-	add ebx, 3
-	add ebx, 4
-	mov eax, 1
-	int 0x80 ; exit
+	xor rdi, rdi
+	add rdi, 1
+	add rdi, 2
+	add rdi, 3
+	add rdi, 4
+	mov rax, 60 ; exit
+	syscall
+	ret

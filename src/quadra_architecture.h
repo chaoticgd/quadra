@@ -9,6 +9,9 @@ public:
 		const std::string& fname,
 		const std::string& targ,
 		std::ostream* estream);
+	
+	std::vector<std::string> syscall_argument_registers();
+	std::string syscall_return_register();
 
 private:
 	void buildLoader(DocumentStorage& store) override;
