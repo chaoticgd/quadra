@@ -96,7 +96,7 @@ void gen_expr()
 			printf("%d", rand());
 		}
 	} else {
-		switch(rand() % 4) {
+		switch(rand() % 3) {
 			case 0: {
 				printf("(");
 				gen_expr();
