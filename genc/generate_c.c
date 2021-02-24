@@ -28,14 +28,14 @@ int main(int argc, char** argv)
 	printf("#else\n");
 	printf("int _start() {\n");
 	printf("#endif\n");
-	printf("int divtemp;");
+	printf("int divtemp;\n");
 	local_ints = 1 + rand() % 32;
 	for(int i = 0; i < local_ints; i++) {
 		printf("int l_%d = %d;\n", i, rand());
 	}
 	local_ptrs = 1 + rand() % 32;
 	for(int i = 0; i < local_ptrs; i++) {
-		printf("int* p_%d = &l_%d;", i, rand() % local_ints);
+		printf("int* p_%d = &l_%d;\n", i, rand() % local_ints);
 	}
 	for(int i = 0; i < 10; i++) {
 		gen_statement();
@@ -83,7 +83,7 @@ void gen_block()
 		case 1: {
 			printf("if(");
 			gen_expr();
-			printf(")\n");
+			printf(")");
 			break;
 		}
 	}
