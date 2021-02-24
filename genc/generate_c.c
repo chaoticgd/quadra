@@ -7,7 +7,8 @@ void gen_statement();
 void gen_block();
 void gen_expr();
 
-int locals;
+int local_ints;
+int local_ptrs;
 int depth = 0;
 int iterator_count = 0;
 int last_assigned = 0;
@@ -28,9 +29,13 @@ int main(int argc, char** argv)
 	printf("int _start() {\n");
 	printf("#endif\n");
 	printf("int divtemp;");
-	locals = 1 + rand() % 32;
-	for(int i = 0; i < locals; i++) {
+	local_ints = 1 + rand() % 32;
+	for(int i = 0; i < local_ints; i++) {
 		printf("int l_%d = %d;\n", i, rand());
+	}
+	local_ptrs = 1 + rand() % 32;
+	for(int i = 0; i < local_ptrs; i++) {
+		printf("int* p_%d = &l_%d;", i, rand() % local_ints);
 	}
 	for(int i = 0; i < 10; i++) {
 		gen_statement();
@@ -43,18 +48,22 @@ int main(int argc, char** argv)
 void gen_statement()
 {
 	depth++;
-	switch(rand() % 2) {
+	switch(rand() % 3) {
 		case 0: {
 			if(depth < 3) {
 				gen_block();
 				break;
 			}
 		}
-		case 1: { // assignment
-			last_assigned = rand() % locals;
+		case 1: { // assign integer
+			last_assigned = rand() % local_ints;
 			printf("l_%d = ", last_assigned);
 			gen_expr();
 			printf(";\n");
+			break;
+		}
+		case 2: { // assign pointer
+			printf("p_%d = &l_%d;\n", rand() % local_ptrs, rand() % local_ints);
 			break;
 		}
 	}
@@ -90,10 +99,10 @@ void gen_expr()
 {
 	depth++;
 	if(depth > 5) {
-		if(rand() % 2 == 0) {
-			printf("l_%d", rand() % locals);
-		} else {
-			printf("%d", rand());
+		switch(rand() % 3) {
+			case 0: printf("l_%d", rand() % local_ints); break;
+			case 1: printf("*p_%d", rand() % local_ptrs); break;
+			case 2: printf("%d", rand()); break;
 		}
 	} else {
 		switch(rand() % 3) {
