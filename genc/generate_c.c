@@ -105,38 +105,28 @@ void gen_expr()
 			case 2: printf("%d", rand()); break;
 		}
 	} else {
-		switch(rand() % 3) {
-			case 0: {
+		char binops[] = { '+', '-', '*', '&', '|', '^', };
+		char unaryops[] = { '-', '~' };
+		int choice = rand() % 8;
+		switch(choice) {
+			case 0:
+			case 1:
+			case 2:
+			case 3:
+			case 4:
+			case 5: {
 				printf("(");
 				gen_expr();
-				printf(")+(");
+				printf(")%c(", binops[choice]);
 				gen_expr();
 				printf(")");
 				break;
 			}
-			case 1: {
-				printf("(");
-				gen_expr();
-				printf(")-(");
-				gen_expr();
-				printf(")");
-				break;
-			}
-			case 2: {
-				printf("(");
-				gen_expr();
-				printf(")*(");
+			case 6:
+			case 7: {
+				printf("%c(", unaryops[choice - 6]);
 				gen_expr();
 				printf(")");
-				break;
-			}
-			case 3: {
-				printf("(divtemp=(");
-				gen_expr();
-				printf("), (");
-				gen_expr();
-				printf(")/(divtemp==0?1:divtemp))");
-				break;
 			}
 		}
 	}
