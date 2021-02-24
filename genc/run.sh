@@ -1,5 +1,5 @@
 genc_dir=$(dirname $0)
-gcc "${genc_dir}/generate_c.c" -o "${misc_dir}/generate_c"
+gcc "${genc_dir}/generate_c.c" -o "${genc_dir}/generate_c"
 ${misc_dir}/generate_c $@ > /tmp/quadra_genc.c
 gcc /tmp/quadra_genc.c -o /tmp/quadra_genc_native
 /tmp/quadra_genc_native
