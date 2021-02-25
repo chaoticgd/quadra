@@ -225,6 +225,8 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			output = _builder.CreateSub(zero(op.getIn(0)->getSize()), inputs[0], "", false, false);
 			break;
 		case CPUI_INT_NEGATE: // 25
+			assert(isize == 1);
+			output = _builder.CreateNot(inputs[0], "");
 			break;
 		case CPUI_INT_XOR: // 26
 			assert(isize == 2);
