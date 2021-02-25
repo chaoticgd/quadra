@@ -253,6 +253,10 @@ void QuadraTranslator::translate_pcodeop(const PcodeOp& op)
 			output = _builder.CreateLShr(inputs[0], tmp1, "", false);
 			break;
 		case CPUI_INT_SRIGHT: // 31
+			assert(isize == 2);
+			assert(op.getOut()->getSize() == op.getIn(0)->getSize());
+			tmp1 = _builder.CreateZExt(inputs[1], int_type(op.getIn(0)->getSize()), "");
+			output = _builder.CreateAShr(inputs[0], tmp1, "", false);
 			break;
 		case CPUI_INT_MULT: // 32
 			assert(isize == 2);
