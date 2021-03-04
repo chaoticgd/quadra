@@ -470,7 +470,7 @@ llvm::Value* QuadraTranslator::decompress_pointer(llvm::Value* val, llvm::Value*
 	auto hi_mask = llvm::ConstantInt::get(_context, llvm::APInt(64, 0xffffffff00000000, false));
 	auto stack_ptr = _builder.CreatePtrToInt(hi, int_type(8));
 	auto stack_ptr_hi = _builder.CreateAnd(stack_ptr, hi_mask);
-	auto lo_ptr = _builder.CreateZExt(val, int_type(8));
+	auto lo_ptr = _builder.CreateZExt(_builder.CreateTrunc(val, int_type(4)), int_type(8));
 	auto combined_ptr = _builder.CreateOr(stack_ptr_hi, lo_ptr);
 	return _builder.CreateIntToPtr(combined_ptr, ptr_type);
 }
@@ -577,7 +577,7 @@ llvm::Function* QuadraTranslator::create_syscall_dispatcher()
 		std::vector<llvm::Value*> args;
 		for(int i = 0; i < syscall.argument_types.size(); i++) {
 			llvm::Value* arg = _builder.CreateLoad(arg_regs[i]);
-			llvm::Type* arg_type =  to_llvm_type(syscall.argument_types[i]);
+			llvm::Type* arg_type = to_llvm_type(syscall.argument_types[i]);
 			if(arg_type->isPointerTy()) {
 				arg = decompress_pointer(arg, dummy_alloca, arg_type);
 			} else {
