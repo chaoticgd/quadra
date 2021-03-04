@@ -26,6 +26,7 @@ case "$1" in
 	("addc")    run_demo ee-objdump examples/addc.c examples/mips/addc;;
 	("loop")    run_demo ee-objdump examples/loop.c examples/mips/loop;;
 	("intargs") run_demo ee-objdump examples/intargs.c examples/mips/intargs;;
+	("hello")   run_demo ee-objdump examples/mips/hello.c examples/mips/hello;;
 	# x86 examples
 	("x86add")  run_demo    objdump "" examples/x86/add;;
 esac
