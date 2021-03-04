@@ -32,7 +32,7 @@ std::vector<std::string> QuadraArchitecture::syscall_argument_registers()
 std::string QuadraArchitecture::syscall_return_register()
 {
 	switch(((ElfLoader*) loader)->machine()) {
-		case ElfMachine::MIPS: return { "v0" };
+		case ElfMachine::MIPS: return { "v0_lo" };
 		case ElfMachine::AMD64: return { "RAX" };
 	}
 	assert(0);

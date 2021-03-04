@@ -385,10 +385,19 @@ llvm::Value* QuadraTranslator::get_input(const Varnode* var)
 	return _builder.CreateLoad(get_local(var), "");
 }
 
+VarnodeData varnode_to_varnodedata(const Varnode* var)
+{
+	VarnodeData result;
+	result.space = var->getSpace();
+	result.offset = var->getOffset();
+	result.size = var->getSize();
+	return result;
+}
+
 llvm::Value* QuadraTranslator::get_local(const Varnode* var)
 {
 	if(var->getSpace()->getName() == "register") {
-		return get_register(var->getOffset(), var->getSize());
+		return get_register(varnode_to_varnodedata(var));
 	}
 	
 	auto compare_varnodes = [](const Varnode* l, const Varnode* r) {
@@ -424,12 +433,32 @@ llvm::Value* QuadraTranslator::get_local(const Varnode* var)
 	return local;
 }
 
-llvm::Value* QuadraTranslator::get_register(uintb offset, int4 size_bytes)
+llvm::Value* QuadraTranslator::get_register(VarnodeData reg)
 {
-	auto offset_const = llvm::ConstantInt::get(_context, llvm::APInt(32, offset, false));
-	llvm::Value* ptr8 = _builder.CreateGEP(register_storage(), offset_const, "");
-	auto ptr_type = llvm::PointerType::get(int_type(size_bytes), _register_space);
-	return _builder.CreatePointerCast(ptr8, ptr_type, "");
+	auto iter = _function.register_pointers.find(reg);
+	llvm::Value* value;
+	if(iter == _function.register_pointers.end()) {
+		// The register hasn't been previosuly referenced in this function, so
+		// we need to create a pointer to it. For niceness, we put this pointer
+		// in the entry block of the function.
+		llvm::IRBuilder<> entry_builder(
+			&_function.llvm->getEntryBlock(),
+			_function.llvm->getEntryBlock().begin());
+		value = create_pointer_to_register(reg, entry_builder);
+		_function.register_pointers[reg] = value;
+	} else {
+		value = iter->second;
+	}
+	return value;
+}
+
+llvm::Value* QuadraTranslator::create_pointer_to_register(VarnodeData reg, llvm::IRBuilder<>& builder)
+{
+	auto offset_const = llvm::ConstantInt::get(_context, llvm::APInt(32, reg.offset, false));
+	llvm::Value* ptr8 = builder.CreateGEP(register_storage(), offset_const, "");
+	auto ptr_type = llvm::PointerType::get(int_type(reg.size), _register_space);
+	auto name = _arch->translate->getRegisterName(reg.space, reg.offset, reg.size);
+	return builder.CreatePointerCast(ptr8, ptr_type, name);
 }
 
 llvm::Value* QuadraTranslator::decompress_pointer(llvm::Value* val, llvm::Value* hi, llvm::Type* ptr_type)
@@ -504,7 +533,7 @@ llvm::Function* QuadraTranslator::create_syscall_dispatcher()
 	std::vector<llvm::Value*> arg_regs;
 	for(auto& name : arg_reg_names) {
 		VarnodeData reg = _arch->translate->getRegister(name);
-		arg_regs.push_back(get_register(reg.offset, reg.size));
+		arg_regs.push_back(create_pointer_to_register(reg, _builder));
 	}
 	llvm::Type* char_type = llvm::Type::getInt8Ty(_context);
 	llvm::Type* u32_type = llvm::Type::getInt32Ty(_context);
@@ -522,8 +551,7 @@ llvm::Function* QuadraTranslator::create_syscall_dispatcher()
 	llvm::AllocaInst* dummy_alloca = _builder.CreateAlloca(int_type(1), nullptr, "stackframe");
 	
 	VarnodeData syscall_number_reg = _arch->translate->getRegister(_arch->syscall_return_register());
-	
-	llvm::Value* v0_ptr = get_register(syscall_number_reg.offset, 4);
+	llvm::Value* v0_ptr = create_pointer_to_register(syscall_number_reg, _builder);
 	auto syscall_number = _builder.CreateLoad(v0_ptr);
 	
 	for(auto& [number, syscall] : _arch->syscalls()) {
