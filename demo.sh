@@ -23,7 +23,6 @@ run_demo() {
 case "$1" in
 	# MIPS examples
 	("add")     run_demo ee-objdump "" examples/mips/add;;
-	("addc")    run_demo ee-objdump examples/addc.c examples/mips/addc;;
 	("loop")    run_demo ee-objdump examples/loop.c examples/mips/loop;;
 	("intargs") run_demo ee-objdump examples/intargs.c examples/mips/intargs;;
 	("hello")   run_demo ee-objdump examples/mips/hello.c examples/mips/hello;;
