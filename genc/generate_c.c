@@ -88,7 +88,7 @@ void gen_block()
 		}
 	}
 	printf(" {\n");
-	for(int i = 0; i < 3 - depth; i++) {
+	for(int i = 0; i < 5 - depth; i++) {
 		gen_statement();
 	}
 	printf("}\n");
