@@ -1,0 +1,13 @@
+
+examples/x86/add:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000401000 <_start>:
+  401000:	48 31 c0             	xor    %rax,%rax
+  401003:	48 83 c0 01          	add    $0x1,%rax
+  401007:	48 83 c0 02          	add    $0x2,%rax
+  40100b:	48 83 c0 03          	add    $0x3,%rax
+  40100f:	48 83 c0 04          	add    $0x4,%rax
+  401013:	c3                   	retq   

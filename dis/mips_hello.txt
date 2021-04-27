@@ -1,0 +1,53 @@
+
+examples/mips/hello:     file format elf32-littlemips
+
+Disassembly of section .text:
+
+00100000 <syscall>:
+  100000:	0080102d 	move	v0,a0
+  100004:	00a0202d 	move	a0,a1
+  100008:	00c0282d 	move	a1,a2
+  10000c:	00e0302d 	move	a2,a3
+  100010:	0000000c 	syscall
+  100014:	03e00008 	jr	ra
+  100018:	0040102d 	move	v0,v0
+  10001c:	00000000 	nop
+
+00100020 <_start>:
+  100020:	27bdfff0 	addiu	sp,sp,-16
+  100024:	2406006c 	li	a2,108
+  100028:	2404006f 	li	a0,111
+  10002c:	24090048 	li	t1,72
+  100030:	240d0065 	li	t5,101
+  100034:	240c0020 	li	t4,32
+  100038:	240b0077 	li	t3,119
+  10003c:	24080072 	li	t0,114
+  100040:	24050064 	li	a1,100
+  100044:	24020021 	li	v0,33
+  100048:	2403000a 	li	v1,10
+  10004c:	a3a90000 	sb	t1,0(sp)
+  100050:	a3ad0001 	sb	t5,1(sp)
+  100054:	240a0001 	li	t2,1
+  100058:	24090fa4 	li	t1,4004
+  10005c:	a3ac0005 	sb	t4,5(sp)
+  100060:	2407000d 	li	a3,13
+  100064:	a3ab0006 	sb	t3,6(sp)
+  100068:	a3a40007 	sb	a0,7(sp)
+  10006c:	a3a80008 	sb	t0,8(sp)
+  100070:	a3a60009 	sb	a2,9(sp)
+  100074:	a3a5000a 	sb	a1,10(sp)
+  100078:	a3a2000b 	sb	v0,11(sp)
+  10007c:	a3a3000c 	sb	v1,12(sp)
+  100080:	a3a60002 	sb	a2,2(sp)
+  100084:	a3a60003 	sb	a2,3(sp)
+  100088:	a3a40004 	sb	a0,4(sp)
+  10008c:	0120102d 	move	v0,t1
+  100090:	0140202d 	move	a0,t2
+  100094:	03a0282d 	move	a1,sp
+  100098:	00e0302d 	move	a2,a3
+  10009c:	0000000c 	syscall
+  1000a0:	0040202d 	move	a0,v0
+  1000a4:	03e00008 	jr	ra
+  1000a8:	27bd0010 	addiu	sp,sp,16
+  1000ac:	00000000 	nop
+Disassembly of section .data:

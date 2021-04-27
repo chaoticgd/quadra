@@ -1,0 +1,17 @@
+
+examples/mips/loop:     file format elf32-littlemips
+
+Disassembly of section .text:
+
+00100000 <_start>:
+  100000:	0000202d 	move	a0,zero
+  100004:	0000182d 	move	v1,zero
+  100008:	00832021 	addu	a0,a0,v1
+  10000c:	24630001 	addiu	v1,v1,1
+  100010:	2865000a 	slti	a1,v1,10
+  100014:	14a0fffc 	bnez	a1,100008 <_start+0x8>
+  100018:	00000000 	nop
+  10001c:	03e00008 	jr	ra
+  100020:	0080102d 	move	v0,a0
+  100024:	00000000 	nop
+Disassembly of section .data:

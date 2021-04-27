@@ -1,0 +1,13 @@
+
+examples/mips/add:     file format elf32-littlemips
+
+Disassembly of section .text:
+
+00100000 <_ftext>:
+  100000:	3c020000 	lui	v0,0x0
+  100004:	20420001 	addi	v0,v0,1
+  100008:	20420002 	addi	v0,v0,2
+  10000c:	20420003 	addi	v0,v0,3
+  100010:	03e00008 	jr	ra
+  100014:	20420004 	addi	v0,v0,4
+Disassembly of section .data:
