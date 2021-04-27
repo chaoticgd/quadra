@@ -25,10 +25,10 @@ run_demo() {
 # A number of pre-prepared example programs.
 case "$1" in
 	# MIPS examples
-	("add")     run_demo dis/mips_add.txt "" examples/mips/add;;
-	("loop")    run_demo dis/mips_loop.txt examples/loop.c examples/mips/loop;;
+	("add")     run_demo dis/mips_add.txt ""  examples/mips/add;;
+	("loop")    run_demo dis/mips_loop.txt    examples/loop.c examples/mips/loop;;
 	("intargs") run_demo dis/mips_intargs.txt examples/intargs.c examples/mips/intargs;;
-	("hello")   run_demo dis/mips_hello.txt examples/mips/hello.c examples/mips/hello;;
+	("hello")   run_demo dis/mips_hello.txt   examples/mips/hello.c examples/mips/hello;;
 	# x86 examples
-	("x86add")  run_demo    dis/x86_add.txt "" examples/x86/add;;
+	("x86add")  run_demo dis/x86_add.txt  ""  examples/x86/add;;
 esac
