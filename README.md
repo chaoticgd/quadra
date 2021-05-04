@@ -13,4 +13,4 @@ Many-to-many binary translation using Ghidra and LLVM.
 
 Quadra has been tested to work on Ubuntu Linux 20.04.
 
-The `GHIDRA_DIR` enviroment variable must be set to the path of a Ghidra installation. The MIPS processor currently supported is the R5900, so the Ghidra installation must have the [ghidra-emotionengine](https://github.com/beardypig/ghidra-emotionengine) plugin installed.
+The `GHIDRA_DIR` enviroment variable must be set to the path of a Ghidra installation. The MIPS processor currently supported is the R5900, so the Ghidra installation must have the [ghidra-emotionengine](https://github.com/beardypig/ghidra-emotionengine) plugin installed (and compiled to a .sla file using the sleigh_opt utility included with the decompiler).
